@@ -1,17 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Dices, LayoutGrid, PlayCircle, Settings2, Disc, Monitor, Grid3X3, History, RotateCcw } from 'lucide-react';
+import { Plus, Dices, LayoutGrid, PlayCircle, Settings2, Disc, Monitor, History, RotateCcw } from 'lucide-react';
 import { Template, HistoryItem } from './types';
 import { DEFAULT_TEMPLATES } from './constants';
 import TemplateCard from './components/TemplateCard';
 import TemplateEditor from './components/TemplateEditor';
 import Wheel from './components/Wheel';
 import DigitalRoller from './components/DigitalRoller';
-import GridSelector from './components/GridSelector';
 import ResultModal from './components/ResultModal';
 import HistoryModal from './components/HistoryModal';
 import ConfirmModal from './components/ConfirmModal';
 
-type DisplayMode = 'wheel' | 'roller' | 'grid';
+type DisplayMode = 'wheel' | 'roller';
 
 function App() {
   // Initialize from LocalStorage or use defaults
@@ -135,6 +134,11 @@ function App() {
   };
 
   const handleSpinEnd = (result: string) => {
+    // Trigger vibration
+    if (typeof navigator !== 'undefined' && navigator.vibrate) {
+      navigator.vibrate([50, 30, 50, 30, 100]);
+    }
+
     setSpinResult(result);
     if (activeTemplate) {
       const newItem: HistoryItem = {
@@ -160,14 +164,6 @@ function App() {
         return (
           <DigitalRoller
             options={activeTemplate.options}
-            onSpinEnd={handleSpinEnd}
-          />
-        );
-      case 'grid':
-        return (
-          <GridSelector
-            options={activeTemplate.options}
-            colorTheme={activeTemplate.colorTheme}
             onSpinEnd={handleSpinEnd}
           />
         );
@@ -260,13 +256,6 @@ function App() {
                       title="数字滚动"
                     >
                       <Monitor size={20} />
-                    </button>
-                    <button
-                      onClick={() => setDisplayMode('grid')}
-                      className={`p-2.5 rounded-xl transition-all ${displayMode === 'grid' ? 'bg-white text-orange-500 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
-                      title="幸运卡片"
-                    >
-                      <Grid3X3 size={20} />
                     </button>
                   </div>
                 </div>

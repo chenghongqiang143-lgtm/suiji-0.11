@@ -76,11 +76,18 @@ const Wheel: React.FC<WheelProps> = ({ options, colorTheme = 'default', onSpinEn
     initAudio();
     setIsSpinning(true);
     
-    velocityRef.current = 30 + Math.random() * 20; 
+    // Increased initial velocity for a more energetic start
+    velocityRef.current = 50 + Math.random() * 25; 
     
     const animate = () => {
       rotationRef.current += velocityRef.current;
-      velocityRef.current *= 0.985; // Deceleration
+      
+      // Dynamic Friction Logic:
+      // When velocity is high, use low friction (0.985) for a smooth long spin.
+      // When velocity drops below 1.5, increase friction (0.92) to brake harder.
+      // This prevents the wheel from "crawling" slowly at the end.
+      const friction = velocityRef.current < 1.5 ? 0.92 : 0.985;
+      velocityRef.current *= friction;
       
       if (rotateRef.current) {
         rotateRef.current.style.transform = `rotate(${rotationRef.current}deg)`;
@@ -92,7 +99,8 @@ const Wheel: React.FC<WheelProps> = ({ options, colorTheme = 'default', onSpinEn
         lastTickIndexRef.current = currentTick;
       }
 
-      if (velocityRef.current < 0.02) {
+      // Increased stop threshold from 0.02 to 0.1 for a crisper finish
+      if (velocityRef.current < 0.1) {
         setIsSpinning(false);
         velocityRef.current = 0;
         
