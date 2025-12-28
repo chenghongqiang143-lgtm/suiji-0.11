@@ -87,8 +87,9 @@ const GridSelector: React.FC<GridSelectorProps> = ({ options, colorTheme = 'defa
   };
 
   return (
-    <div className="flex flex-col items-center w-full max-w-lg mx-auto gap-6">
-      <div className="w-full grid grid-cols-2 md:grid-cols-3 gap-3 p-2">
+    <div className="w-full max-w-lg mx-auto">
+      {/* Grid Content - Added generous bottom padding so content scrolls above fixed button */}
+      <div className="w-full grid grid-cols-2 md:grid-cols-3 gap-3 p-2 pb-40">
         {options.map((option, index) => {
            const isActive = activeIndex === index;
            
@@ -115,13 +116,16 @@ const GridSelector: React.FC<GridSelectorProps> = ({ options, colorTheme = 'defa
         })}
       </div>
 
-      <button 
-        onClick={handleStart}
-        disabled={isSpinning}
-        className="px-12 py-4 bg-white border-2 border-orange-100 text-orange-600 hover:bg-orange-50 hover:border-orange-200 rounded-full font-bold text-xl shadow-lg shadow-orange-100/50 hover:shadow-orange-200 hover:-translate-y-1 active:translate-y-0 transition-all disabled:opacity-50 disabled:transform-none"
-      >
-        {isSpinning ? '...' : '选一张'}
-      </button>
+      {/* Fixed Button - Positioned above the bottom navigation bar */}
+      <div className="fixed bottom-28 left-0 right-0 flex justify-center z-20 pointer-events-none">
+        <button 
+          onClick={handleStart}
+          disabled={isSpinning}
+          className="pointer-events-auto px-12 py-4 bg-white/90 backdrop-blur-md border-2 border-orange-100 text-orange-600 hover:bg-orange-50 hover:border-orange-200 rounded-full font-bold text-xl shadow-[0_8px_25px_rgba(251,146,60,0.25)] hover:shadow-orange-200/50 hover:-translate-y-1 active:translate-y-0 transition-all disabled:opacity-50 disabled:transform-none flex items-center gap-2"
+        >
+           {isSpinning ? '...' : '选一张'}
+        </button>
+      </div>
     </div>
   );
 };
