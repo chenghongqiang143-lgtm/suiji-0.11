@@ -2,7 +2,7 @@
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>转盘决定 - SpinDecide</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@300;400;600&display=swap" rel="stylesheet">
@@ -47,6 +47,12 @@
       ::-webkit-scrollbar-thumb:hover {
         background: #fb923c; /* Orange-400 */
       }
+
+      /* Handle Safe Areas for Mobile */
+      :root {
+        --safe-top: env(safe-area-inset-top, 0px);
+        --safe-bottom: env(safe-area-inset-bottom, 0px);
+      }
     </style>
   <script type="importmap">
 {
@@ -63,6 +69,5 @@
 </head>
   <body class="bg-gradient-to-br from-orange-50/50 via-white to-amber-50/50 text-slate-800 h-screen w-screen overflow-hidden select-none">
     <div id="root" class="h-full w-full"></div>
-    <script type="module" src="/index.tsx"></script>
   </body>
 </html>

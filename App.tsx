@@ -158,11 +158,12 @@ function App() {
   };
 
   return (
-    <div className="h-full w-full flex flex-col relative">
+    <div className="h-full w-full flex flex-col relative overflow-hidden">
       <div className="fixed top-[-20%] right-[-10%] w-[500px] h-[500px] bg-orange-200/20 rounded-full blur-[100px] pointer-events-none" />
       <div className="fixed bottom-[-10%] left-[-10%] w-[400px] h-[400px] bg-yellow-200/20 rounded-full blur-[80px] pointer-events-none" />
 
-      <header className="px-6 py-5 z-20 flex items-center justify-between flex-none backdrop-blur-md bg-white/40 border-b border-white/50">
+      {/* Header with Safe Area Padding */}
+      <header className="px-6 pb-5 z-20 flex items-center justify-between flex-none backdrop-blur-md bg-white/40 border-b border-white/50" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 1.25rem)' }}>
         <div className="flex items-center gap-3">
           <div className="p-2 rounded-xl bg-white shadow-sm border border-orange-100 text-orange-500">
             <Dices size={20} />
@@ -289,8 +290,8 @@ function App() {
         </div>
       </main>
 
-      {/* Optimized Bottom Nav - White Background */}
-      <div className="fixed bottom-6 left-0 right-0 flex justify-center z-40 pointer-events-none px-6">
+      {/* Optimized Bottom Nav - White Background with Safe Area Padding */}
+      <div className="fixed bottom-0 left-0 right-0 flex justify-center z-40 pointer-events-none px-6" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 1.5rem)' }}>
         <nav className="bg-white/90 backdrop-blur-xl px-1.5 py-1.5 rounded-[20px] flex items-center shadow-[0_10px_40px_rgba(0,0,0,0.1)] pointer-events-auto gap-1 border border-slate-200/50 max-w-sm w-full">
           <button 
             onClick={() => setCurrentTab('execute')}

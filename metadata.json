@@ -1,5 +1,5 @@
 {
-  "name": "SpinDecide",
+  "name": "随机生成SpinDecide",
   "description": "A dynamic random event selector using a spinning wheel. Create custom decision templates or use AI to generate options.",
   "requestFramePermissions": []
 }
