@@ -249,14 +249,14 @@ function App() {
       <div className="fixed top-[-20%] right-[-10%] w-[500px] h-[500px] bg-orange-200/20 rounded-full blur-[100px] pointer-events-none" />
       <div className="fixed bottom-[-10%] left-[-10%] w-[400px] h-[400px] bg-yellow-200/20 rounded-full blur-[80px] pointer-events-none" />
 
-      {/* Header with Safe Area Padding */}
-      <header className="px-6 pb-5 z-20 flex items-center justify-between flex-none backdrop-blur-md bg-white/40 border-b border-white/50" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 1.25rem)' }}>
+      {/* Header with Enhanced Safe Area Padding */}
+      <header className="px-6 pb-5 z-20 flex items-center justify-between flex-none backdrop-blur-md bg-white/40 border-b border-white/50" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 1.75rem)' }}>
         <div className="flex items-center gap-3">
           <div className="p-2 rounded-xl bg-white shadow-sm border border-orange-100 text-orange-500">
             {isGenericTool ? <Hash size={20} /> : <Dices size={20} />}
           </div>
           <div className="flex flex-col">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1.5">
               {currentTab === 'execute' ? (isGenericTool ? t.genericTitle : t.decision) : t.collection}
             </span>
             <h1 className="text-base font-black text-slate-800 tracking-tight truncate max-w-[150px] sm:max-w-[240px] leading-tight">
@@ -283,7 +283,6 @@ function App() {
             </button>
           )}
 
-          {/* Show Edit/History if we have a template AND we are in template mode */}
           {currentTab === 'execute' && (
              <div className="flex gap-3">
                <button 
@@ -338,9 +337,7 @@ function App() {
                   </div>
                 </div>
 
-                {/* Content Area */}
                 {(!activeTemplate && !isGenericTool) ? (
-                  // Empty State for Templates
                   <div className="flex-1 flex flex-col items-center justify-center text-center py-10 animate-fade-in">
                     <div className="w-24 h-24 bg-white rounded-[32px] flex items-center justify-center mb-6 shadow-2xl shadow-orange-100 border border-orange-50/50">
                       <Dices size={48} className="text-orange-200" />
@@ -364,14 +361,12 @@ function App() {
                     </div>
                   </div>
                 ) : (
-                  // Active Tool/Template Visualizer
                   <div className="flex-1 flex flex-col items-center justify-center animate-fade-in min-h-[350px]">
                     {renderVisualizer()}
                   </div>
                 )}
               </div>
           ) : (
-            // Template Gallery
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 animate-fade-in pb-10">
               {templates.map(template => (
                 <TemplateCard
@@ -397,7 +392,6 @@ function App() {
         </div>
       </main>
 
-      {/* Optimized Bottom Nav */}
       <div className="fixed bottom-0 left-0 right-0 flex justify-center z-40 pointer-events-none px-6" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 1.5rem)' }}>
         <nav className="bg-white/90 backdrop-blur-xl px-1.5 py-1.5 rounded-[20px] flex items-center shadow-[0_10px_40px_rgba(0,0,0,0.1)] pointer-events-auto gap-1 border border-slate-200/50 max-w-sm w-full">
           <button 
