@@ -1,17 +1,22 @@
 import React from 'react';
 import { X, Trash2, Clock, Calendar } from 'lucide-react';
-import { HistoryItem } from '../types';
+import { HistoryItem, AppSettings } from '../types';
 
 interface HistoryModalProps {
   history: HistoryItem[];
   onClose: () => void;
   onClear: () => void;
+  settings?: AppSettings;
 }
 
-const HistoryModal: React.FC<HistoryModalProps> = ({ history, onClose, onClear }) => {
+const HistoryModal: React.FC<HistoryModalProps> = ({ history, onClose, onClear, settings }) => {
   const formatDate = (ts: number) => {
-    return new Date(ts).toLocaleString('zh-CN', {
-      month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+    // Use system locale default since we removed the manual 12/24h toggle
+    return new Date(ts).toLocaleString(settings?.language === 'en' ? 'en-US' : 'zh-CN', {
+      month: 'short', 
+      day: 'numeric', 
+      hour: '2-digit', 
+      minute: '2-digit'
     });
   };
 
@@ -26,14 +31,14 @@ const HistoryModal: React.FC<HistoryModalProps> = ({ history, onClose, onClear }
         <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-white z-10">
           <div className="flex items-center gap-2 text-slate-800">
              <Clock size={20} className="text-orange-500"/>
-             <h2 className="text-lg font-bold">历史记录</h2>
+             <h2 className="text-lg font-bold">{settings?.language === 'en' ? 'History' : '历史记录'}</h2>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-3">
             {history.length > 0 && (
                 <button 
                   onClick={onClear}
                   className="p-2 text-slate-400 hover:text-rose-500 rounded-full hover:bg-rose-50 transition-colors"
-                  title="清空历史"
+                  title="清空"
                 >
                   <Trash2 size={18} />
                 </button>
@@ -51,7 +56,7 @@ const HistoryModal: React.FC<HistoryModalProps> = ({ history, onClose, onClear }
           {history.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-slate-400 space-y-3">
               <Calendar size={48} className="opacity-20" />
-              <p>暂无记录</p>
+              <p>{settings?.language === 'en' ? 'No history yet' : '暂无记录'}</p>
             </div>
           ) : (
             history.map((item) => (

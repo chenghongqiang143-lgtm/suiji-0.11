@@ -17,3 +17,7 @@ export interface HistoryItem {
   templateTitle: string;
   timestamp: number;
 }
+
+export interface AppSettings {
+  language: 'zh' | 'en';
+}

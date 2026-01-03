@@ -9,14 +9,22 @@ const DigitalRoller: React.FC<DigitalRollerProps> = ({ options, onSpinEnd }) => 
   const [isSpinning, setIsSpinning] = useState(false);
   const [displayOptions, setDisplayOptions] = useState<string[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const firstItemRef = useRef<HTMLDivElement>(null); // Ref to measure actual height
   const audioCtxRef = useRef<AudioContext | null>(null);
+  
+  const lastWinnerIndexRef = useRef<number>(1);
 
-  // Initialize display list (duplicate options to allow scrolling)
   useEffect(() => {
-    // We create a long list for the scrolling effect
-    // 50 repetitions should be enough for the animation duration
-    const repeated = Array(50).fill(options).flat();
+    // 60 repetitions
+    const repeated = Array(60).fill(options).flat();
     setDisplayOptions(repeated);
+    
+    lastWinnerIndexRef.current = 1;
+    
+    if (scrollRef.current) {
+       scrollRef.current.style.transition = 'none';
+       scrollRef.current.style.transform = 'translateY(0px)';
+    }
   }, [options]);
 
   const initAudio = () => {
@@ -38,7 +46,6 @@ const DigitalRoller: React.FC<DigitalRollerProps> = ({ options, onSpinEnd }) => 
       osc.connect(gain);
       gain.connect(ctx.destination);
       
-      // Deeper, mechanical click sound
       osc.type = 'square';
       osc.frequency.setValueAtTime(150, ctx.currentTime);
       osc.frequency.exponentialRampToValueAtTime(40, ctx.currentTime + 0.05);
@@ -53,40 +60,47 @@ const DigitalRoller: React.FC<DigitalRollerProps> = ({ options, onSpinEnd }) => 
     }
   };
 
+  const getItemHeight = () => {
+    if (firstItemRef.current) {
+      return firstItemRef.current.getBoundingClientRect().height;
+    }
+    return 80; // Fallback
+  };
+
   const handleSpin = () => {
-    if (isSpinning || !scrollRef.current) return;
+    if (isSpinning || !scrollRef.current || options.length === 0) return;
     initAudio();
     setIsSpinning(true);
 
     const winnerIndex = Math.floor(Math.random() * options.length);
     const winner = options[winnerIndex];
     
-    // Calculate scroll target
-    // Item height = 80px (h-20)
-    // We want to land on the winner somewhere deep in the list
-    // Let's pick an occurrence of the winner near the end of our repeated list
-    const itemHeight = 80;
-    const targetCycle = 35; // How many full loops to spin roughly
-    // Find the index of the winner in the large array that corresponds to this cycle
+    // Dynamically measure the item height to ensure pixel-perfect alignment
+    // This fixes issues where scaling/zooming causes the hardcoded 80px to be off.
+    const itemHeight = getItemHeight();
+    
+    // 1. SETUP START POSITION
+    const startCycle = 2;
+    const safeLastIndex = lastWinnerIndexRef.current % options.length;
+    const startIndex = (startCycle * options.length) + safeLastIndex;
+    
+    const startPos = (startIndex * itemHeight) - itemHeight;
+    
+    scrollRef.current.style.transition = 'none';
+    scrollRef.current.style.transform = `translateY(-${startPos}px)`;
+    
+    scrollRef.current.offsetHeight; // force reflow
+
+    // 2. CALCULATE TARGET POSITION
+    const targetCycle = 35 + Math.floor(Math.random() * 5); 
     const targetIndex = (targetCycle * options.length) + winnerIndex;
     
-    // Random offset to center the text slightly imperfectly then snap? 
-    // No, simpler to just scroll to exact position for now.
-    const scrollTarget = targetIndex * itemHeight;
+    const targetPos = (targetIndex * itemHeight) - itemHeight;
 
-    // Reset scroll to 0 immediately before starting
-    scrollRef.current.style.transition = 'none';
-    scrollRef.current.style.transform = 'translateY(0px)';
-    
-    // Force reflow
-    scrollRef.current.offsetHeight;
-
-    // Start Animation
-    // Cubic-bezier for a "slot machine" pull effect: slow start, fast middle, bounce stop
+    // 3. ANIMATE
     scrollRef.current.style.transition = 'transform 3s cubic-bezier(0.15, 0.5, 0.15, 1)'; 
-    scrollRef.current.style.transform = `translateY(-${scrollTarget}px)`;
+    scrollRef.current.style.transform = `translateY(-${targetPos}px)`;
 
-    // Audio clicks during spin
     let clickCount = 0;
     const maxClicks = 20;
     const clickInterval = setInterval(() => {
@@ -95,10 +109,12 @@ const DigitalRoller: React.FC<DigitalRollerProps> = ({ options, onSpinEnd }) => 
       if (clickCount >= maxClicks) clearInterval(clickInterval);
     }, 100);
 
+    lastWinnerIndexRef.current = winnerIndex;
+
     setTimeout(() => {
       setIsSpinning(false);
       onSpinEnd(winner);
-    }, 3200); // Wait for transition + a tiny buffer
+    }, 3200);
   };
 
   return (
@@ -126,6 +142,7 @@ const DigitalRoller: React.FC<DigitalRollerProps> = ({ options, onSpinEnd }) => 
             {displayOptions.map((opt, i) => (
               <div 
                 key={i} 
+                ref={i === 0 ? firstItemRef : null}
                 className="h-20 w-full flex items-center justify-center flex-none border-b border-slate-100 text-slate-800 font-bold text-2xl px-4 text-center"
               >
                 {opt}

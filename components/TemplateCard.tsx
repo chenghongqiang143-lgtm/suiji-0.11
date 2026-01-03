@@ -27,7 +27,7 @@ const TemplateCard: React.FC<TemplateCardProps> = ({ template, onSelect, onDelet
 
       {/* Top Section: Title & Actions */}
       <div className="flex items-start justify-between mb-2">
-        <div className="flex-1 min-w-0 pr-8">
+        <div className="flex-1 min-w-0 pr-20">
           <h3 className="font-bold text-sm text-slate-800 tracking-tight truncate leading-tight">
             {template.title}
           </h3>
@@ -38,20 +38,21 @@ const TemplateCard: React.FC<TemplateCardProps> = ({ template, onSelect, onDelet
           </div>
         </div>
 
-        <div className="absolute top-3 right-3 flex gap-1 sm:opacity-0 group-hover:opacity-100 transition-all duration-200">
+        {/* Unified Button Style */}
+        <div className="absolute top-2 right-2 flex gap-2 sm:opacity-0 group-hover:opacity-100 transition-all duration-200">
           <button 
             type="button"
             onClick={(e) => { e.stopPropagation(); onEdit(template); }}
-            className="w-7 h-7 flex items-center justify-center bg-slate-50 text-slate-400 hover:text-orange-500 rounded-lg border border-slate-100 transition-all"
+            className="p-2 text-slate-400 hover:text-orange-600 bg-slate-50 hover:bg-white rounded-lg transition-all border border-transparent hover:border-orange-100 hover:shadow-sm"
           >
-            <Edit size={12} />
+            <Edit size={18} />
           </button>
           <button 
             type="button"
             onClick={(e) => { e.stopPropagation(); onDelete(template.id); }}
-            className="w-7 h-7 flex items-center justify-center bg-slate-50 text-slate-400 hover:text-rose-500 rounded-lg border border-slate-100 transition-all"
+            className="p-2 text-slate-400 hover:text-rose-600 bg-slate-50 hover:bg-white rounded-lg transition-all border border-transparent hover:border-rose-100 hover:shadow-sm"
           >
-            <Trash2 size={12} />
+            <Trash2 size={18} />
           </button>
         </div>
       </div>
