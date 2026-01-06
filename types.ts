@@ -1,9 +1,11 @@
+
 export interface Template {
   id: string;
   title: string;
   options: string[];
   colorTheme?: string;
   isDefault?: boolean;
+  lastSelectedOption?: string;
 }
 
 export type WheelSegment = {

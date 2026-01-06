@@ -4,6 +4,7 @@ import { Template, HistoryItem, AppSettings } from './types';
 import { DEFAULT_TEMPLATES } from './constants';
 import TemplateCard from './components/TemplateCard';
 import TemplateEditor from './components/TemplateEditor';
+import OptionPickerModal from './components/OptionPickerModal';
 import Wheel from './components/Wheel';
 import DigitalRoller from './components/DigitalRoller';
 import RandomNumberGenerator from './components/RandomNumberGenerator';
@@ -11,10 +12,15 @@ import ResultModal from './components/ResultModal';
 import HistoryModal from './components/HistoryModal';
 import ConfirmModal from './components/ConfirmModal';
 import SettingsModal from './components/SettingsModal';
+import SplashScreen from './components/SplashScreen';
 
 type DisplayMode = 'wheel' | 'roller' | 'number';
 
 function App() {
+  // --- Startup State ---
+  const [isReady, setIsReady] = useState(false);
+  const [initError, setInitError] = useState<string | null>(null);
+
   // --- Settings ---
   const [settings, setSettings] = useState<AppSettings>(() => {
     try {
@@ -57,11 +63,48 @@ function App() {
   const [showHistory, setShowHistory] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<Template | null>(null);
+  
+  // Manual Selection State
+  const [manualSelectTemplate, setManualSelectTemplate] = useState<Template | null>(null);
+  
   const [spinResult, setSpinResult] = useState<string | null>(null);
   
   const [deleteConfirm, setDeleteConfirm] = useState<{show: boolean, templateId: string | null}>({ show: false, templateId: null });
   const [restoreConfirm, setRestoreConfirm] = useState(false);
   const [clearHistoryConfirm, setClearHistoryConfirm] = useState(false);
+
+  // --- Startup Effect ---
+  useEffect(() => {
+    const initApp = async () => {
+      try {
+        // Minimum display time for splash screen to prevent flicker
+        const minLoadPromise = new Promise(resolve => setTimeout(resolve, 800));
+        
+        // Wait for fonts to load if browser supports it
+        const fontReadyPromise = document.fonts ? document.fonts.ready : Promise.resolve();
+        
+        await Promise.all([minLoadPromise, fontReadyPromise]);
+        
+        setIsReady(true);
+      } catch (err) {
+        console.error("Initialization error:", err);
+        // On error, we still try to proceed after a moment, or set error state
+        setIsReady(true);
+      }
+    };
+
+    // Timeout protection: If app takes too long (e.g. 5s), force load
+    const timeoutId = setTimeout(() => {
+      if (!isReady) {
+        console.warn("App load timed out, forcing render.");
+        setIsReady(true);
+      }
+    }, 5000);
+
+    initApp();
+
+    return () => clearTimeout(timeoutId);
+  }, []);
 
   // --- Effects ---
   useEffect(() => {
@@ -102,6 +145,10 @@ function App() {
     setEditingTemplate(template);
     setShowEditor(true);
   };
+  
+  const handleOpenManualSelect = (template: Template) => {
+    setManualSelectTemplate(template);
+  };
 
   const handleDeleteRequest = (id: string) => {
     setDeleteConfirm({ show: true, templateId: id });
@@ -140,6 +187,30 @@ function App() {
     }
   };
 
+  const recordResult = (result: string, titleOverride?: string, templateId?: string) => {
+     // Title determination
+    let finalTitle = titleOverride || 'Unknown';
+    if (!titleOverride && activeTemplate) finalTitle = activeTemplate.title;
+    if (displayMode === 'number') finalTitle = settings.language === 'zh' ? '随机数' : 'RNG';
+
+    // Update History
+    const newItem: HistoryItem = {
+      id: Date.now().toString(),
+      result,
+      templateTitle: finalTitle,
+      timestamp: Date.now()
+    };
+    setHistory(prev => [newItem, ...prev].slice(0, 50));
+
+    // Update Template's "Last Selected" state if applicable
+    const targetTemplateId = templateId || activeTemplateId;
+    if (targetTemplateId && displayMode !== 'number') {
+      setTemplates(prev => prev.map(t => 
+        t.id === targetTemplateId ? { ...t, lastSelectedOption: result } : t
+      ));
+    }
+  };
+
   const handleSpinEnd = (result: string, titleOverride?: string) => {
     if (typeof navigator !== 'undefined' && navigator.vibrate) {
       navigator.vibrate([50, 30, 50, 30, 100]);
@@ -151,17 +222,14 @@ function App() {
       setSpinResult(result);
     }
     
-    // Title determination
-    let finalTitle = activeTemplate?.title || 'Unknown';
-    if (displayMode === 'number') finalTitle = settings.language === 'zh' ? '随机数' : 'RNG';
+    recordResult(result, titleOverride);
+  };
 
-    const newItem: HistoryItem = {
-      id: Date.now().toString(),
-      result,
-      templateTitle: titleOverride || finalTitle,
-      timestamp: Date.now()
-    };
-    setHistory(prev => [newItem, ...prev].slice(0, 50));
+  const handleManualOptionSelect = (option: string) => {
+    if (manualSelectTemplate) {
+      recordResult(option, manualSelectTemplate.title, manualSelectTemplate.id);
+      setManualSelectTemplate(null);
+    }
   };
 
   const handleConfirmClearHistory = () => {
@@ -243,6 +311,10 @@ function App() {
         return <Wheel options={activeTemplate.options} colorTheme={activeTemplate.colorTheme} onSpinEnd={(res) => handleSpinEnd(res)} />;
     }
   };
+
+  if (!isReady) {
+    return <SplashScreen error={initError} onRetry={() => window.location.reload()} />;
+  }
 
   return (
     <div className="h-full w-full flex flex-col relative overflow-hidden">
@@ -375,12 +447,13 @@ function App() {
                   onSelect={handleSelectTemplate}
                   onEdit={handleEdit}
                   onDelete={handleDeleteRequest}
+                  onManualSelect={handleOpenManualSelect}
                 />
               ))}
               
               <button
                 onClick={handleCreateNew}
-                className="group relative w-full h-[110px] rounded-2xl border-2 border-dashed border-slate-200 hover:border-orange-400 bg-white/40 hover:bg-orange-50/30 transition-all duration-300 cursor-pointer flex flex-col items-center justify-center gap-2 text-slate-400 hover:text-orange-600"
+                className="group relative w-full h-[140px] rounded-2xl border-2 border-dashed border-slate-200 hover:border-orange-400 bg-white/40 hover:bg-orange-50/30 transition-all duration-300 cursor-pointer flex flex-col items-center justify-center gap-2 text-slate-400 hover:text-orange-600"
               >
                 <div className="p-2 rounded-lg bg-slate-100/50 group-hover:bg-orange-100 transition-colors">
                   <Plus size={20} />
@@ -418,6 +491,14 @@ function App() {
           onSave={handleSaveTemplate}
           onCancel={() => setShowEditor(false)}
           onDelete={handleDeleteRequest}
+        />
+      )}
+      
+      {manualSelectTemplate && (
+        <OptionPickerModal
+          template={manualSelectTemplate}
+          onSelect={handleManualOptionSelect}
+          onClose={() => setManualSelectTemplate(null)}
         />
       )}
 

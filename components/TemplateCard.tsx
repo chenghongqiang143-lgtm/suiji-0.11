@@ -1,6 +1,6 @@
 import React from 'react';
 import { Template } from '../types';
-import { Trash2, Edit, ChevronRight } from 'lucide-react';
+import { Trash2, Edit, ChevronRight, MousePointerClick, Trophy } from 'lucide-react';
 import { COLOR_THEMES } from '../constants';
 
 interface TemplateCardProps {
@@ -8,15 +8,16 @@ interface TemplateCardProps {
   onSelect: (t: Template) => void;
   onDelete: (id: string) => void;
   onEdit: (t: Template) => void;
+  onManualSelect: (t: Template) => void;
 }
 
-const TemplateCard: React.FC<TemplateCardProps> = ({ template, onSelect, onDelete, onEdit }) => {
+const TemplateCard: React.FC<TemplateCardProps> = ({ template, onSelect, onDelete, onEdit, onManualSelect }) => {
   const theme = COLOR_THEMES[template.colorTheme as keyof typeof COLOR_THEMES] || COLOR_THEMES.default;
   const primaryColor = theme.colors[0];
 
   return (
     <div 
-      className="group relative bg-white rounded-2xl p-4 shadow-[0_2px_15px_rgba(0,0,0,0.02)] hover:shadow-[0_12px_30px_rgba(0,0,0,0.06)] transition-all duration-300 border border-slate-100 hover:border-orange-100 cursor-pointer overflow-hidden flex flex-col h-[110px] sm:h-[120px]"
+      className="group relative bg-white rounded-2xl p-4 shadow-[0_2px_15px_rgba(0,0,0,0.02)] hover:shadow-[0_12px_30px_rgba(0,0,0,0.06)] transition-all duration-300 border border-slate-100 hover:border-orange-100 cursor-pointer overflow-hidden flex flex-col h-[140px]"
       onClick={() => onSelect(template)}
     >
       {/* Subtle Accent Line */}
@@ -27,7 +28,7 @@ const TemplateCard: React.FC<TemplateCardProps> = ({ template, onSelect, onDelet
 
       {/* Top Section: Title & Actions */}
       <div className="flex items-start justify-between mb-2">
-        <div className="flex-1 min-w-0 pr-20">
+        <div className="flex-1 min-w-0 pr-24">
           <h3 className="font-bold text-sm text-slate-800 tracking-tight truncate leading-tight">
             {template.title}
           </h3>
@@ -38,38 +39,62 @@ const TemplateCard: React.FC<TemplateCardProps> = ({ template, onSelect, onDelet
           </div>
         </div>
 
-        {/* Unified Button Style */}
-        <div className="absolute top-2 right-2 flex gap-2 sm:opacity-0 group-hover:opacity-100 transition-all duration-200">
+        {/* Action Buttons */}
+        <div className="absolute top-2 right-2 flex gap-1 sm:opacity-0 group-hover:opacity-100 transition-all duration-200">
+          <button 
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onManualSelect(template); }}
+            className="p-2 text-slate-400 hover:text-indigo-600 bg-slate-50 hover:bg-white rounded-lg transition-all border border-transparent hover:border-indigo-100 hover:shadow-sm"
+            title="手动选择结果"
+          >
+            <MousePointerClick size={16} />
+          </button>
           <button 
             type="button"
             onClick={(e) => { e.stopPropagation(); onEdit(template); }}
             className="p-2 text-slate-400 hover:text-orange-600 bg-slate-50 hover:bg-white rounded-lg transition-all border border-transparent hover:border-orange-100 hover:shadow-sm"
+            title="编辑"
           >
-            <Edit size={18} />
+            <Edit size={16} />
           </button>
           <button 
             type="button"
             onClick={(e) => { e.stopPropagation(); onDelete(template.id); }}
             className="p-2 text-slate-400 hover:text-rose-600 bg-slate-50 hover:bg-white rounded-lg transition-all border border-transparent hover:border-rose-100 hover:shadow-sm"
+            title="删除"
           >
-            <Trash2 size={18} />
+            <Trash2 size={16} />
           </button>
         </div>
       </div>
+      
+      {/* Last Result Display (Priority over tags if exists) */}
+      <div className="mt-1 flex-1">
+        {template.lastSelectedOption ? (
+           <div className="bg-orange-50/50 border border-orange-100 rounded-lg p-2 flex items-center gap-2">
+              <div className="p-1 bg-white rounded-full text-orange-500 shadow-sm">
+                 <Trophy size={12} />
+              </div>
+              <div className="min-w-0">
+                 <div className="text-[9px] text-orange-400 font-bold uppercase tracking-wider leading-none mb-0.5">最近结果</div>
+                 <div className="text-sm font-bold text-slate-700 truncate">{template.lastSelectedOption}</div>
+              </div>
+           </div>
+        ) : (
+           <div className="h-full flex items-center">
+             <p className="text-xs text-slate-400 line-clamp-2 leading-relaxed">
+               {template.options.join(', ')}
+             </p>
+           </div>
+        )}
+      </div>
 
-      {/* Bottom Section: Compact Preview Tags */}
-      <div className="mt-auto flex items-center justify-between">
-        <div className="flex flex-wrap gap-1.5 overflow-hidden">
-          {template.options.slice(0, 2).map((opt, i) => (
-            <span key={i} className="text-[9px] px-2 py-0.5 bg-slate-50 text-slate-500 rounded-md font-bold truncate max-w-[70px] border border-slate-100">
-              {opt}
-            </span>
-          ))}
-          {template.options.length > 2 && (
-            <span className="text-[9px] px-1.5 py-0.5 bg-orange-50 text-orange-600 rounded-md font-black">
-              +{template.options.length - 2}
-            </span>
-          )}
+      {/* Bottom Section: Footer */}
+      <div className="mt-2 flex items-center justify-between">
+        <div className="flex items-center gap-1.5">
+           <span className="text-[10px] font-medium text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded-md">
+             {template.options.length} 选项
+           </span>
         </div>
         
         <div className="text-slate-200 group-hover:text-orange-300 transition-all duration-300">
