@@ -1,6 +1,6 @@
 import React from 'react';
 import { Template } from '../types';
-import { Trash2, Edit, ChevronRight, MousePointerClick, Trophy } from 'lucide-react';
+import { Trash2, Edit, ChevronRight, MousePointerClick, Trophy, Sparkles } from 'lucide-react';
 import { COLOR_THEMES } from '../constants';
 
 interface TemplateCardProps {
@@ -68,7 +68,7 @@ const TemplateCard: React.FC<TemplateCardProps> = ({ template, onSelect, onDelet
         </div>
       </div>
       
-      {/* Last Result Display (Priority over tags if exists) */}
+      {/* Last Result Display (Priority over default placeholder) */}
       <div className="mt-1 flex-1">
         {template.lastSelectedOption ? (
            <div className="bg-orange-50/50 border border-orange-100 rounded-lg p-2 flex items-center gap-2">
@@ -82,9 +82,12 @@ const TemplateCard: React.FC<TemplateCardProps> = ({ template, onSelect, onDelet
            </div>
         ) : (
            <div className="h-full flex items-center">
-             <p className="text-xs text-slate-400 line-clamp-2 leading-relaxed">
-               {template.options.join(', ')}
-             </p>
+             <div className="flex items-center gap-2 opacity-50 group-hover:opacity-80 transition-opacity">
+               <div className="p-1.5 bg-slate-50 rounded-full border border-slate-100">
+                 <Sparkles size={14} className="text-slate-400" />
+               </div>
+               <span className="text-xs text-slate-400 font-medium">准备就绪</span>
+             </div>
            </div>
         )}
       </div>
