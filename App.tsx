@@ -5,6 +5,7 @@ import { DEFAULT_TEMPLATES } from './constants';
 import TemplateCard from './components/TemplateCard';
 import TemplateEditor from './components/TemplateEditor';
 import OptionPickerModal from './components/OptionPickerModal';
+import NoteInputModal from './components/NoteInputModal';
 import Wheel from './components/Wheel';
 import DigitalRoller from './components/DigitalRoller';
 import RandomNumberGenerator from './components/RandomNumberGenerator';
@@ -67,6 +68,11 @@ function App() {
   // Manual Selection State
   const [manualSelectTemplate, setManualSelectTemplate] = useState<Template | null>(null);
   
+  // Note Editing State
+  const [noteModal, setNoteModal] = useState<{show: boolean, templateId: string | null, initialNote: string}>({
+    show: false, templateId: null, initialNote: ''
+  });
+
   const [spinResult, setSpinResult] = useState<string | null>(null);
   
   const [deleteConfirm, setDeleteConfirm] = useState<{show: boolean, templateId: string | null}>({ show: false, templateId: null });
@@ -150,6 +156,23 @@ function App() {
     setManualSelectTemplate(template);
   };
 
+  const handleOpenNoteModal = (template: Template) => {
+    setNoteModal({
+      show: true,
+      templateId: template.id,
+      initialNote: template.lastSelectedNote || ''
+    });
+  };
+
+  const handleSaveNote = (note: string) => {
+    if (noteModal.templateId) {
+      setTemplates(prev => prev.map(t => 
+        t.id === noteModal.templateId ? { ...t, lastSelectedNote: note } : t
+      ));
+    }
+    setNoteModal({ show: false, templateId: null, initialNote: '' });
+  };
+
   const handleDeleteRequest = (id: string) => {
     setDeleteConfirm({ show: true, templateId: id });
   };
@@ -203,10 +226,11 @@ function App() {
     setHistory(prev => [newItem, ...prev].slice(0, 50));
 
     // Update Template's "Last Selected" state if applicable
+    // IMPORTANT: Clear the note when a new result is generated/selected
     const targetTemplateId = templateId || activeTemplateId;
     if (targetTemplateId && displayMode !== 'number') {
       setTemplates(prev => prev.map(t => 
-        t.id === targetTemplateId ? { ...t, lastSelectedOption: result } : t
+        t.id === targetTemplateId ? { ...t, lastSelectedOption: result, lastSelectedNote: undefined } : t
       ));
     }
   };
@@ -448,6 +472,7 @@ function App() {
                   onEdit={handleEdit}
                   onDelete={handleDeleteRequest}
                   onManualSelect={handleOpenManualSelect}
+                  onEditNote={handleOpenNoteModal}
                 />
               ))}
               
@@ -499,6 +524,14 @@ function App() {
           template={manualSelectTemplate}
           onSelect={handleManualOptionSelect}
           onClose={() => setManualSelectTemplate(null)}
+        />
+      )}
+
+      {noteModal.show && (
+        <NoteInputModal
+          initialNote={noteModal.initialNote}
+          onSave={handleSaveNote}
+          onClose={() => setNoteModal({ show: false, templateId: null, initialNote: '' })}
         />
       )}
 
