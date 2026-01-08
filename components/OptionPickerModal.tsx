@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { X, CheckCircle2 } from 'lucide-react';
 import { Template } from '../types';
 
@@ -9,6 +9,26 @@ interface OptionPickerModalProps {
 }
 
 const OptionPickerModal: React.FC<OptionPickerModalProps> = ({ template, onSelect, onClose }) => {
+  
+  // Handle Back Gesture
+  useEffect(() => {
+    const stateId = 'picker';
+    window.history.pushState({ modal: stateId }, '', window.location.href);
+
+    const handlePopState = () => {
+      onClose();
+    };
+
+    window.addEventListener('popstate', handlePopState);
+
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+      if (window.history.state?.modal === stateId) {
+        window.history.back();
+      }
+    };
+  }, []);
+
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
       <div 
@@ -16,7 +36,7 @@ const OptionPickerModal: React.FC<OptionPickerModalProps> = ({ template, onSelec
         onClick={onClose}
       />
       
-      <div className="relative bg-white w-full max-w-sm rounded-3xl shadow-2xl flex flex-col max-h-[80vh] animate-bounce-in overflow-hidden">
+      <div className="relative bg-white w-full max-w-sm rounded-3xl shadow-2xl flex flex-col max-h-[80vh] animate-modal-enter overflow-hidden transform-gpu">
         {/* Header */}
         <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-white z-10">
           <div>

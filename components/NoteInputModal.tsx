@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StickyNote } from 'lucide-react';
 
 interface NoteInputModalProps {
@@ -11,6 +11,25 @@ interface NoteInputModalProps {
 const NoteInputModal: React.FC<NoteInputModalProps> = ({ initialNote, onSave, onClose, title }) => {
   const [note, setNote] = useState(initialNote);
 
+  // Handle Back Gesture
+  useEffect(() => {
+    const stateId = 'note';
+    window.history.pushState({ modal: stateId }, '', window.location.href);
+
+    const handlePopState = () => {
+      onClose();
+    };
+
+    window.addEventListener('popstate', handlePopState);
+
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+      if (window.history.state?.modal === stateId) {
+        window.history.back();
+      }
+    };
+  }, []);
+
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
       <div 
@@ -18,7 +37,7 @@ const NoteInputModal: React.FC<NoteInputModalProps> = ({ initialNote, onSave, on
         onClick={onClose}
       />
       
-      <div className="relative bg-white w-full max-w-xs sm:max-w-sm rounded-3xl shadow-2xl p-6 animate-bounce-in z-10">
+      <div className="relative bg-white w-full max-w-xs sm:max-w-sm rounded-3xl shadow-2xl p-6 animate-modal-enter z-10 transform-gpu">
          <div className="flex items-center gap-2 mb-4 text-slate-800">
             <div className="p-2 bg-orange-50 text-orange-500 rounded-full border border-orange-100">
                <StickyNote size={20} />

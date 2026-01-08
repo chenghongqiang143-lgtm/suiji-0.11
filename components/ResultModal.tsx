@@ -10,6 +10,25 @@ interface ResultModalProps {
 
 const ResultModal: React.FC<ResultModalProps> = ({ result, onClose, onSpinAgain }) => {
   
+  // Handle Back Gesture
+  useEffect(() => {
+    const stateId = 'result';
+    window.history.pushState({ modal: stateId }, '', window.location.href);
+    
+    const handlePopState = () => {
+      onClose();
+    };
+
+    window.addEventListener('popstate', handlePopState);
+
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+      if (window.history.state?.modal === stateId) {
+        window.history.back();
+      }
+    };
+  }, []);
+
   const playWinSound = () => {
     try {
       const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
@@ -75,7 +94,7 @@ const ResultModal: React.FC<ResultModalProps> = ({ result, onClose, onSpinAgain 
         onClick={onClose}
       />
       
-      <div className="relative bg-white w-full max-w-sm rounded-[32px] shadow-2xl p-8 text-center animate-bounce-in z-10 overflow-hidden border border-white/50">
+      <div className="relative bg-white w-full max-w-sm rounded-[32px] shadow-2xl p-8 text-center animate-modal-enter z-10 overflow-hidden border border-white/50 transform-gpu">
         {/* Decorative background */}
         <div className="absolute top-0 left-0 right-0 h-32 bg-gradient-to-b from-orange-50 to-transparent pointer-events-none"></div>
 

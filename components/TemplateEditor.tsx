@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Template } from '../types';
 import { COLOR_THEMES } from '../constants';
 import { X, Plus, Trash2, Save } from 'lucide-react';
@@ -14,6 +14,27 @@ const TemplateEditor: React.FC<TemplateEditorProps> = ({ initialTemplate, onSave
   const [title, setTitle] = useState(initialTemplate?.title || '');
   const [options, setOptions] = useState<string[]>(initialTemplate?.options || ['', '', '']);
   const [colorTheme, setColorTheme] = useState<string>(initialTemplate?.colorTheme || 'default');
+
+  // Handle Back Gesture
+  useEffect(() => {
+    // Unique ID for this modal state to ensure we only pop our own state
+    const stateId = 'editor';
+    window.history.pushState({ modal: stateId }, '', window.location.href);
+
+    const handlePopState = (e: PopStateEvent) => {
+      onCancel();
+    };
+
+    window.addEventListener('popstate', handlePopState);
+
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+      // If we are still in the state we pushed (meaning we closed via UI button), go back to clean up history
+      if (window.history.state?.modal === stateId) {
+        window.history.back();
+      }
+    };
+  }, []); // Run once on mount
 
   const handleOptionChange = (index: number, value: string) => {
     const newOptions = [...options];
@@ -54,10 +75,7 @@ const TemplateEditor: React.FC<TemplateEditorProps> = ({ initialTemplate, onSave
   
   const handleDeleteClick = () => {
     if (initialTemplate && onDelete) {
-        // onDelete from App usually contains window.confirm logic
         onDelete(initialTemplate.id);
-        // Note: We don't manually call onCancel() here because App's handleDelete 
-        // will close the editor if the deletion was successful (confirmed).
     }
   };
 
@@ -68,7 +86,7 @@ const TemplateEditor: React.FC<TemplateEditorProps> = ({ initialTemplate, onSave
         onClick={onCancel}
       />
       
-      <div className="relative bg-white w-full max-w-lg h-[90vh] sm:h-auto sm:max-h-[85vh] rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col animate-bounce-in overflow-hidden">
+      <div className="relative bg-white w-full max-w-lg h-[90vh] sm:h-auto sm:max-h-[85vh] rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col animate-modal-enter overflow-hidden transform-gpu">
         {/* Header */}
         <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-white z-10">
           <h2 className="text-xl font-bold text-slate-800">

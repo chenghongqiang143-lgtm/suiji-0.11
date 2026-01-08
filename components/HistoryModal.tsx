@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { X, Trash2, Clock, Calendar } from 'lucide-react';
 import { HistoryItem, AppSettings } from '../types';
 
@@ -10,8 +10,26 @@ interface HistoryModalProps {
 }
 
 const HistoryModal: React.FC<HistoryModalProps> = ({ history, onClose, onClear, settings }) => {
+  // Handle Back Gesture
+  useEffect(() => {
+    const stateId = 'history';
+    window.history.pushState({ modal: stateId }, '', window.location.href);
+
+    const handlePopState = () => {
+      onClose();
+    };
+
+    window.addEventListener('popstate', handlePopState);
+
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+      if (window.history.state?.modal === stateId) {
+        window.history.back();
+      }
+    };
+  }, []);
+
   const formatDate = (ts: number) => {
-    // Use system locale default since we removed the manual 12/24h toggle
     return new Date(ts).toLocaleString(settings?.language === 'en' ? 'en-US' : 'zh-CN', {
       month: 'short', 
       day: 'numeric', 
@@ -27,7 +45,7 @@ const HistoryModal: React.FC<HistoryModalProps> = ({ history, onClose, onClear, 
         onClick={onClose}
       />
       
-      <div className="relative bg-white w-full max-w-md h-[80vh] sm:h-[70vh] rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col animate-bounce-in overflow-hidden">
+      <div className="relative bg-white w-full max-w-md h-[80vh] sm:h-[70vh] rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col animate-modal-enter overflow-hidden transform-gpu">
         <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-white z-10">
           <div className="flex items-center gap-2 text-slate-800">
              <Clock size={20} className="text-orange-500"/>

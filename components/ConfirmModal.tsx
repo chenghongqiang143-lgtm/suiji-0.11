@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { AlertTriangle } from 'lucide-react';
 
 interface ConfirmModalProps {
@@ -20,6 +20,27 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
   confirmText = "确认",
   cancelText = "取消"
 }) => {
+  // Handle Back Gesture
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const stateId = 'confirm';
+    window.history.pushState({ modal: stateId }, '', window.location.href);
+
+    const handlePopState = () => {
+      onCancel();
+    };
+
+    window.addEventListener('popstate', handlePopState);
+
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+      if (window.history.state?.modal === stateId) {
+        window.history.back();
+      }
+    };
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   return (
@@ -31,7 +52,7 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
       />
       
       {/* Modal */}
-      <div className="relative bg-white w-full max-w-sm rounded-3xl shadow-2xl p-6 text-center animate-bounce-in z-10 overflow-hidden border border-slate-100">
+      <div className="relative bg-white w-full max-w-sm rounded-3xl shadow-2xl p-6 text-center animate-modal-enter z-10 overflow-hidden border border-slate-100 transform-gpu">
         <div className="w-16 h-16 bg-rose-50 rounded-full flex items-center justify-center mx-auto mb-4">
           <AlertTriangle size={32} className="text-rose-500" />
         </div>

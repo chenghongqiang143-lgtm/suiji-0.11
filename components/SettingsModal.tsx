@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Globe, Check, Trash2, AlertTriangle } from 'lucide-react';
 import { AppSettings } from '../types';
 
@@ -12,6 +12,25 @@ interface SettingsModalProps {
 const SettingsModal: React.FC<SettingsModalProps> = ({ settings, onSave, onResetData, onClose }) => {
   const [localSettings, setLocalSettings] = React.useState<AppSettings>(settings);
   const [confirmReset, setConfirmReset] = useState(false);
+
+  // Handle Back Gesture
+  useEffect(() => {
+    const stateId = 'settings';
+    window.history.pushState({ modal: stateId }, '', window.location.href);
+
+    const handlePopState = () => {
+      onClose();
+    };
+
+    window.addEventListener('popstate', handlePopState);
+
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+      if (window.history.state?.modal === stateId) {
+        window.history.back();
+      }
+    };
+  }, []);
 
   const handleSave = () => {
     onSave(localSettings);
@@ -34,7 +53,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ settings, onSave, onReset
         onClick={onClose}
       />
       
-      <div className="relative bg-white w-full max-w-sm rounded-[32px] shadow-2xl overflow-hidden animate-bounce-in flex flex-col max-h-[80vh]">
+      <div className="relative bg-white w-full max-w-sm rounded-[32px] shadow-2xl overflow-hidden animate-modal-enter flex flex-col max-h-[80vh] transform-gpu">
         <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-white z-10">
           <h2 className="text-xl font-black text-slate-800 tracking-tight">
             {localSettings.language === 'zh' ? '设置' : 'Settings'}
