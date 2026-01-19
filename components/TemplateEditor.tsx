@@ -1,16 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { Template } from '../types';
+import { Template, ThemeColor } from '../types';
 import { COLOR_THEMES } from '../constants';
 import { X, Plus, Trash2, Save } from 'lucide-react';
 
 interface TemplateEditorProps {
   initialTemplate?: Template | null;
+  themeColor?: ThemeColor;
   onSave: (template: Template) => void;
   onCancel: () => void;
   onDelete?: (id: string) => void;
 }
 
-const TemplateEditor: React.FC<TemplateEditorProps> = ({ initialTemplate, onSave, onCancel, onDelete }) => {
+const TemplateEditor: React.FC<TemplateEditorProps> = ({ initialTemplate, themeColor = 'orange', onSave, onCancel, onDelete }) => {
   const [title, setTitle] = useState(initialTemplate?.title || '');
   const [options, setOptions] = useState<string[]>(initialTemplate?.options || ['', '', '']);
   const [colorTheme, setColorTheme] = useState<string>(initialTemplate?.colorTheme || 'default');
@@ -113,7 +114,7 @@ const TemplateEditor: React.FC<TemplateEditorProps> = ({ initialTemplate, onSave
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="例如：周末去哪儿玩？"
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all font-medium text-slate-800"
+                className={`w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-${themeColor}-500/20 focus:border-${themeColor}-500 transition-all font-medium text-slate-800`}
               />
             </div>
           </div>
@@ -129,7 +130,7 @@ const TemplateEditor: React.FC<TemplateEditorProps> = ({ initialTemplate, onSave
                   key={theme.id}
                   onClick={() => setColorTheme(theme.id)}
                   className={`flex-none p-1 rounded-xl border-2 transition-all ${
-                    colorTheme === theme.id ? 'border-orange-500 scale-105' : 'border-transparent hover:border-slate-200'
+                    colorTheme === theme.id ? `border-${themeColor}-500 scale-105` : 'border-transparent hover:border-slate-200'
                   }`}
                 >
                   <div className="w-20 h-12 rounded-lg flex overflow-hidden shadow-sm">
@@ -163,7 +164,7 @@ const TemplateEditor: React.FC<TemplateEditorProps> = ({ initialTemplate, onSave
                     value={option}
                     onChange={(e) => handleOptionChange(index, e.target.value)}
                     placeholder={`选项 ${index + 1}`}
-                    className="flex-1 px-4 py-2.5 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all text-sm"
+                    className={`flex-1 px-4 py-2.5 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-${themeColor}-500/20 focus:border-${themeColor}-500 transition-all text-sm`}
                   />
                   <button
                     onClick={() => removeOption(index)}
@@ -178,7 +179,7 @@ const TemplateEditor: React.FC<TemplateEditorProps> = ({ initialTemplate, onSave
 
             <button
               onClick={addOption}
-              className="w-full py-3 mt-2 border-2 border-dashed border-slate-200 rounded-xl text-slate-400 font-semibold hover:border-orange-400 hover:text-orange-500 hover:bg-orange-50 transition-all flex items-center justify-center gap-2"
+              className={`w-full py-3 mt-2 border-2 border-dashed border-slate-200 rounded-xl text-slate-400 font-semibold hover:border-${themeColor}-400 hover:text-${themeColor}-500 hover:bg-${themeColor}-50 transition-all flex items-center justify-center gap-2`}
             >
               <Plus size={18} />
               添加选项
@@ -199,7 +200,7 @@ const TemplateEditor: React.FC<TemplateEditorProps> = ({ initialTemplate, onSave
           )}
           <button
             onClick={handleSave}
-            className="flex-1 py-3.5 bg-orange-600 text-white rounded-xl font-bold text-lg shadow-xl shadow-orange-200 hover:shadow-2xl hover:bg-orange-700 hover:-translate-y-0.5 active:translate-y-0 transition-all flex items-center justify-center gap-2"
+            className={`flex-1 py-3.5 bg-${themeColor}-600 text-white rounded-xl font-bold text-lg shadow-xl shadow-${themeColor}-200 hover:shadow-2xl hover:bg-${themeColor}-700 hover:-translate-y-0.5 active:translate-y-0 transition-all flex items-center justify-center gap-2`}
           >
             <Save size={20} />
             保存决定

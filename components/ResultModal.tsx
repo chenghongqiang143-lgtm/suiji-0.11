@@ -1,14 +1,16 @@
 import React, { useEffect } from 'react';
 import { X, RefreshCw, Check } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { ThemeColor } from '../types';
 
 interface ResultModalProps {
   result: string;
+  themeColor?: ThemeColor;
   onClose: () => void;
   onSpinAgain: () => void;
 }
 
-const ResultModal: React.FC<ResultModalProps> = ({ result, onClose, onSpinAgain }) => {
+const ResultModal: React.FC<ResultModalProps> = ({ result, themeColor = 'orange', onClose, onSpinAgain }) => {
   
   // Handle Back Gesture
   useEffect(() => {
@@ -96,7 +98,7 @@ const ResultModal: React.FC<ResultModalProps> = ({ result, onClose, onSpinAgain 
       
       <div className="relative bg-white w-full max-w-sm rounded-[32px] shadow-2xl p-8 text-center animate-modal-enter z-10 overflow-hidden border border-white/50 transform-gpu">
         {/* Decorative background */}
-        <div className="absolute top-0 left-0 right-0 h-32 bg-gradient-to-b from-orange-50 to-transparent pointer-events-none"></div>
+        <div className={`absolute top-0 left-0 right-0 h-32 bg-gradient-to-b from-${themeColor}-50 to-transparent pointer-events-none`}></div>
 
         <button 
           onClick={onClose}
@@ -106,10 +108,10 @@ const ResultModal: React.FC<ResultModalProps> = ({ result, onClose, onSpinAgain 
         </button>
 
         <div className="relative z-10 mt-4">
-          <h3 className="text-orange-900/50 uppercase tracking-widest text-[10px] font-bold mb-6 flex items-center justify-center gap-3">
-            <span className="w-6 h-[2px] bg-orange-200 rounded-full"></span>
+          <h3 className={`text-${themeColor}-900/50 uppercase tracking-widest text-[10px] font-bold mb-6 flex items-center justify-center gap-3`}>
+            <span className={`w-6 h-[2px] bg-${themeColor}-200 rounded-full`}></span>
             THE UNIVERSE SAYS
-            <span className="w-6 h-[2px] bg-orange-200 rounded-full"></span>
+            <span className={`w-6 h-[2px] bg-${themeColor}-200 rounded-full`}></span>
           </h3>
           
           <div className="min-h-[120px] flex items-center justify-center">
@@ -121,14 +123,14 @@ const ResultModal: React.FC<ResultModalProps> = ({ result, onClose, onSpinAgain 
           <div className="flex flex-col gap-3">
             <button
               onClick={onClose}
-              className="w-full py-4 rounded-2xl bg-orange-600 text-white font-bold text-lg hover:bg-orange-700 shadow-xl shadow-orange-200 hover:shadow-2xl transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+              className={`w-full py-4 rounded-2xl bg-${themeColor}-600 text-white font-bold text-lg hover:bg-${themeColor}-700 shadow-xl shadow-${themeColor}-200 hover:shadow-2xl transition-all active:scale-[0.98] flex items-center justify-center gap-2`}
             >
               <Check size={20} strokeWidth={3} />
               就它了！
             </button>
             <button
               onClick={onSpinAgain}
-              className="w-full py-4 rounded-2xl bg-white border border-slate-200 text-slate-600 font-bold hover:border-orange-300 hover:text-orange-600 hover:bg-orange-50/50 transition-colors flex items-center justify-center gap-2"
+              className={`w-full py-4 rounded-2xl bg-white border border-slate-200 text-slate-600 font-bold hover:border-${themeColor}-300 hover:text-${themeColor}-600 hover:bg-${themeColor}-50/50 transition-colors flex items-center justify-center gap-2`}
             >
               <RefreshCw size={18} strokeWidth={2.5} />
               再转一次

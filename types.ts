@@ -8,6 +8,7 @@ export interface Template {
   isDefault?: boolean;
   lastSelectedOption?: string;
   lastSelectedNote?: string;
+  optionNotes?: Record<string, string>; // Key: option text, Value: note content
 }
 
 export type WheelSegment = {
@@ -22,6 +23,9 @@ export interface HistoryItem {
   timestamp: number;
 }
 
+export type ThemeColor = 'orange' | 'blue' | 'rose' | 'violet' | 'emerald' | 'amber';
+
 export interface AppSettings {
   language: 'zh' | 'en';
+  themeColor: ThemeColor;
 }

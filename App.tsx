@@ -1,19 +1,21 @@
-import React, { useState, useEffect } from 'react';
-import { Plus, Dices, LayoutGrid, PlayCircle, Settings2, Disc, Monitor, History, RotateCcw, UserCog, Hash } from 'lucide-react';
-import { Template, HistoryItem, AppSettings } from './types';
+import React, { useState, useEffect, Suspense } from 'react';
+import { Plus, Dices, LayoutGrid, PlayCircle, Disc, Monitor, History, RotateCcw, UserCog, Hash, Loader2, Trash2, X } from 'lucide-react';
+import { Template, HistoryItem, AppSettings, ThemeColor } from './types';
 import { DEFAULT_TEMPLATES } from './constants';
 import TemplateCard from './components/TemplateCard';
-import TemplateEditor from './components/TemplateEditor';
-import OptionPickerModal from './components/OptionPickerModal';
-import NoteInputModal from './components/NoteInputModal';
-import Wheel from './components/Wheel';
-import DigitalRoller from './components/DigitalRoller';
-import RandomNumberGenerator from './components/RandomNumberGenerator';
-import ResultModal from './components/ResultModal';
-import HistoryModal from './components/HistoryModal';
-import ConfirmModal from './components/ConfirmModal';
-import SettingsModal from './components/SettingsModal';
 import SplashScreen from './components/SplashScreen';
+
+// Lazy load heavy components for batch loading
+const TemplateEditor = React.lazy(() => import('./components/TemplateEditor'));
+const OptionPickerModal = React.lazy(() => import('./components/OptionPickerModal'));
+const NoteInputModal = React.lazy(() => import('./components/NoteInputModal'));
+const Wheel = React.lazy(() => import('./components/Wheel'));
+const DigitalRoller = React.lazy(() => import('./components/DigitalRoller'));
+const RandomNumberGenerator = React.lazy(() => import('./components/RandomNumberGenerator'));
+const ResultModal = React.lazy(() => import('./components/ResultModal'));
+const HistoryModal = React.lazy(() => import('./components/HistoryModal'));
+const ConfirmModal = React.lazy(() => import('./components/ConfirmModal'));
+const SettingsModal = React.lazy(() => import('./components/SettingsModal'));
 
 type DisplayMode = 'wheel' | 'roller' | 'number';
 
@@ -28,8 +30,11 @@ function App() {
       const saved = localStorage.getItem('spinDecide_settings');
       if (saved) return JSON.parse(saved);
     } catch (e) { console.error(e); }
-    return { language: 'zh' };
+    // Default theme color is orange
+    return { language: 'zh', themeColor: 'orange' };
   });
+
+  const themeColor = settings.themeColor || 'orange';
 
   useEffect(() => {
     localStorage.setItem('spinDecide_settings', JSON.stringify(settings));
@@ -65,6 +70,10 @@ function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<Template | null>(null);
   
+  // Selection / Bulk Action State
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [selectedTemplateIds, setSelectedTemplateIds] = useState<Set<string>>(new Set());
+
   // Manual Selection State
   const [manualSelectTemplate, setManualSelectTemplate] = useState<Template | null>(null);
   
@@ -75,7 +84,7 @@ function App() {
 
   const [spinResult, setSpinResult] = useState<string | null>(null);
   
-  const [deleteConfirm, setDeleteConfirm] = useState<{show: boolean, templateId: string | null}>({ show: false, templateId: null });
+  const [deleteConfirm, setDeleteConfirm] = useState<{show: boolean, templateId: string | null, isBulk?: boolean}>({ show: false, templateId: null });
   const [restoreConfirm, setRestoreConfirm] = useState(false);
   const [clearHistoryConfirm, setClearHistoryConfirm] = useState(false);
 
@@ -83,32 +92,19 @@ function App() {
   useEffect(() => {
     const initApp = async () => {
       try {
-        // Minimum display time for splash screen to prevent flicker
-        const minLoadPromise = new Promise(resolve => setTimeout(resolve, 800));
-        
-        // Wait for fonts to load if browser supports it
+        const minLoadPromise = new Promise(resolve => setTimeout(resolve, 300));
         const fontReadyPromise = document.fonts ? document.fonts.ready : Promise.resolve();
-        
         await Promise.all([minLoadPromise, fontReadyPromise]);
-        
         setIsReady(true);
       } catch (err) {
         console.error("Initialization error:", err);
-        // On error, we still try to proceed after a moment, or set error state
         setIsReady(true);
       }
     };
-
-    // Timeout protection: If app takes too long (e.g. 5s), force load
     const timeoutId = setTimeout(() => {
-      if (!isReady) {
-        console.warn("App load timed out, forcing render.");
-        setIsReady(true);
-      }
-    }, 5000);
-
+      if (!isReady) setIsReady(true);
+    }, 3000);
     initApp();
-
     return () => clearTimeout(timeoutId);
   }, []);
 
@@ -136,7 +132,6 @@ function App() {
     setActiveTemplateId(template.id);
     setSpinResult(null);
     setCurrentTab('execute');
-    // If we were on number mode, switch back to wheel to show the template
     if (displayMode === 'number') {
       setDisplayMode('wheel');
     }
@@ -157,35 +152,106 @@ function App() {
   };
 
   const handleOpenNoteModal = (template: Template) => {
+    const currentOption = template.lastSelectedOption || '';
+    const currentNote = template.lastSelectedNote || '';
+    
+    // Check if the current note matches the saved persistent note for this option
+    const savedNote = template.optionNotes?.[currentOption];
+    
+    // Prioritize existing note (could be modified), then saved note
+    const noteToShow = currentNote || savedNote || '';
+
     setNoteModal({
       show: true,
       templateId: template.id,
-      initialNote: template.lastSelectedNote || ''
+      initialNote: noteToShow
     });
   };
 
-  const handleSaveNote = (note: string) => {
+  const handleSaveNote = (note: string, persist: boolean) => {
     if (noteModal.templateId) {
-      setTemplates(prev => prev.map(t => 
-        t.id === noteModal.templateId ? { ...t, lastSelectedNote: note } : t
-      ));
+      setTemplates(prev => prev.map(t => {
+        if (t.id === noteModal.templateId) {
+          const currentOption = t.lastSelectedOption;
+          let newOptionNotes = { ...(t.optionNotes || {}) };
+          
+          if (currentOption) {
+            if (persist) {
+              // Save to persistent storage
+              newOptionNotes[currentOption] = note;
+            } else {
+              // Remove from persistent storage if unchecked
+              delete newOptionNotes[currentOption];
+            }
+          }
+
+          return { 
+            ...t, 
+            lastSelectedNote: note,
+            optionNotes: newOptionNotes
+          };
+        }
+        return t;
+      }));
     }
     setNoteModal({ show: false, templateId: null, initialNote: '' });
   };
 
+  // --- Selection Mode Handlers ---
+  const handleLongPress = (template: Template) => {
+    if (!isSelectionMode) {
+      setIsSelectionMode(true);
+      if (window.navigator && window.navigator.vibrate) {
+        window.navigator.vibrate(50);
+      }
+      const newSet = new Set<string>();
+      newSet.add(template.id);
+      setSelectedTemplateIds(newSet);
+    }
+  };
+
+  const handleToggleSelect = (template: Template) => {
+    if (isSelectionMode) {
+      const newSet = new Set(selectedTemplateIds);
+      if (newSet.has(template.id)) {
+        newSet.delete(template.id);
+        // Optional: Exit selection mode if last item deselected
+        // if (newSet.size === 0) setIsSelectionMode(false);
+      } else {
+        newSet.add(template.id);
+      }
+      setSelectedTemplateIds(newSet);
+    }
+  };
+
+  const handleExitSelectionMode = () => {
+    setIsSelectionMode(false);
+    setSelectedTemplateIds(new Set());
+  };
+
   const handleDeleteRequest = (id: string) => {
-    setDeleteConfirm({ show: true, templateId: id });
+    setDeleteConfirm({ show: true, templateId: id, isBulk: false });
+  };
+
+  const handleBulkDeleteRequest = () => {
+    if (selectedTemplateIds.size === 0) return;
+    setDeleteConfirm({ show: true, templateId: null, isBulk: true });
   };
 
   const handleConfirmDelete = () => {
-    if (deleteConfirm.templateId) {
+    if (deleteConfirm.isBulk) {
+      // Bulk Delete
+      setTemplates(prev => prev.filter(t => !selectedTemplateIds.has(t.id)));
+      handleExitSelectionMode();
+    } else if (deleteConfirm.templateId) {
+      // Single Delete (from editor)
       const id = deleteConfirm.templateId;
       setTemplates(prev => prev.filter(t => t.id !== id));
       if (showEditor && editingTemplate?.id === id) {
         setShowEditor(false);
       }
     }
-    setDeleteConfirm({ show: false, templateId: null });
+    setDeleteConfirm({ show: false, templateId: null, isBulk: false });
   };
 
   const handleConfirmRestoreDefaults = () => {
@@ -211,12 +277,10 @@ function App() {
   };
 
   const recordResult = (result: string, titleOverride?: string, templateId?: string) => {
-     // Title determination
     let finalTitle = titleOverride || 'Unknown';
     if (!titleOverride && activeTemplate) finalTitle = activeTemplate.title;
     if (displayMode === 'number') finalTitle = settings.language === 'zh' ? '随机数' : 'RNG';
 
-    // Update History
     const newItem: HistoryItem = {
       id: Date.now().toString(),
       result,
@@ -225,13 +289,21 @@ function App() {
     };
     setHistory(prev => [newItem, ...prev].slice(0, 50));
 
-    // Update Template's "Last Selected" state if applicable
-    // IMPORTANT: Clear the note when a new result is generated/selected
     const targetTemplateId = templateId || activeTemplateId;
     if (targetTemplateId && displayMode !== 'number') {
-      setTemplates(prev => prev.map(t => 
-        t.id === targetTemplateId ? { ...t, lastSelectedOption: result, lastSelectedNote: undefined } : t
-      ));
+      setTemplates(prev => prev.map(t => {
+        if (t.id === targetTemplateId) {
+          // Check if there is a persistent note for this result option
+          const persistentNote = t.optionNotes?.[result];
+          return { 
+            ...t, 
+            lastSelectedOption: result, 
+            // Automatically load persistent note if exists, otherwise clear
+            lastSelectedNote: persistentNote || undefined 
+          };
+        }
+        return t;
+      }));
     }
   };
 
@@ -239,13 +311,9 @@ function App() {
     if (typeof navigator !== 'undefined' && navigator.vibrate) {
       navigator.vibrate([50, 30, 50, 30, 100]);
     }
-    
-    // For Wheel/Roller, we show the modal.
-    // For Number, visual feedback is on screen, so no modal, but we record history.
     if (displayMode === 'wheel' || displayMode === 'roller') {
       setSpinResult(result);
     }
-    
     recordResult(result, titleOverride);
   };
 
@@ -261,23 +329,34 @@ function App() {
     setClearHistoryConfirm(false);
   };
   
-  // Total Reset
   const handleResetApp = () => {
-    // Clear localStorage
-    localStorage.removeItem('spinDecide_templates');
-    localStorage.removeItem('spinDecide_history');
-    localStorage.removeItem('spinDecide_settings');
-    
-    // Reset state
-    setTemplates(DEFAULT_TEMPLATES);
     setHistory([]);
-    setSettings({ language: 'zh' }); // Default back to Chinese as per request context
-    setActiveTemplateId(DEFAULT_TEMPLATES[0].id);
-    setCurrentTab('execute');
-    setDisplayMode('wheel');
-    
-    // Close modal handled in modal itself or parent state
+    setTemplates(prev => prev.map(t => ({
+      ...t,
+      lastSelectedOption: undefined,
+      lastSelectedNote: undefined
+    })));
     setShowSettings(false);
+  };
+
+  const handleExportData = () => {
+    const data = { version: 1, timestamp: Date.now(), templates, history, settings };
+    return JSON.stringify(data, null, 2);
+  };
+
+  const handleImportData = (jsonStr: string) => {
+    try {
+      const data = JSON.parse(jsonStr);
+      if (data.templates && Array.isArray(data.templates)) setTemplates(data.templates);
+      if (data.history && Array.isArray(data.history)) setHistory(data.history);
+      if (data.settings) setSettings(data.settings);
+      alert(settings.language === 'zh' ? '数据恢复成功' : 'Data restored successfully');
+      setShowSettings(false);
+      return true;
+    } catch (e) {
+      alert(settings.language === 'zh' ? '数据格式无效' : 'Invalid data format');
+      return false;
+    }
   };
 
   // --- Text Resources ---
@@ -301,6 +380,8 @@ function App() {
     deleteTitle: settings.language === 'zh' ? '删除决定' : 'Delete Wheel',
     deleteMsg: settings.language === 'zh' ? '确定要删除这个转盘吗？' : 'Are you sure you want to delete this wheel?',
     confirmDelete: settings.language === 'zh' ? '确认删除' : 'Delete',
+    bulkDeleteTitle: settings.language === 'zh' ? '批量删除' : 'Bulk Delete',
+    bulkDeleteMsg: settings.language === 'zh' ? `确定要删除选中的 ${selectedTemplateIds.size} 个转盘吗？` : `Are you sure you want to delete ${selectedTemplateIds.size} selected wheels?`,
     restoreTitle: settings.language === 'zh' ? '恢复默认' : 'Restore Defaults',
     restoreMsg: settings.language === 'zh' ? '确定要重置所有模板吗？' : 'Are you sure you want to reset all templates?',
     confirmRestore: settings.language === 'zh' ? '确认恢复' : 'Restore',
@@ -308,47 +389,67 @@ function App() {
     clearHistoryMsg: settings.language === 'zh' ? '所有的转动历史都将被永久清除。' : 'All history will be permanently deleted.',
     confirmClear: settings.language === 'zh' ? '确认清空' : 'Clear',
     genericTitle: settings.language === 'zh' ? '常用工具' : 'Tools',
+    cancel: settings.language === 'zh' ? '取消' : 'Cancel',
   };
 
   const isGenericTool = displayMode === 'number';
 
-  // Header Title Logic
   const getHeaderTitle = () => {
     if (currentTab === 'templates') return t.library;
     if (displayMode === 'number') return t.number;
     return activeTemplate ? activeTemplate.title : t.unselected;
   };
 
-  const renderVisualizer = () => {
-    // Generic tools don't need a template
-    if (displayMode === 'number') {
-      return <RandomNumberGenerator onSpinEnd={(res) => handleSpinEnd(res)} language={settings.language} />;
-    }
+  const LoadingFallback = () => (
+    <div className="w-full h-full flex items-center justify-center min-h-[300px]">
+      <Loader2 className={`animate-spin text-${themeColor}-500 opacity-50`} size={32} />
+    </div>
+  );
 
-    // Template-based tools
-    if (!activeTemplate) return null;
-    switch (displayMode) {
-      case 'roller':
-        return <DigitalRoller options={activeTemplate.options} onSpinEnd={(res) => handleSpinEnd(res)} />;
-      case 'wheel':
-      default:
-        return <Wheel options={activeTemplate.options} colorTheme={activeTemplate.colorTheme} onSpinEnd={(res) => handleSpinEnd(res)} />;
-    }
+  const renderVisualizer = () => {
+    return (
+      <Suspense fallback={<LoadingFallback />}>
+        {(() => {
+          if (displayMode === 'number') {
+            return <RandomNumberGenerator onSpinEnd={(res) => handleSpinEnd(res)} language={settings.language} />;
+          }
+          if (!activeTemplate) return null;
+          switch (displayMode) {
+            case 'roller':
+              return <DigitalRoller options={activeTemplate.options} onSpinEnd={(res) => handleSpinEnd(res)} />;
+            case 'wheel':
+            default:
+              return <Wheel options={activeTemplate.options} colorTheme={activeTemplate.colorTheme} onSpinEnd={(res) => handleSpinEnd(res)} />;
+          }
+        })()}
+      </Suspense>
+    );
   };
 
   if (!isReady) {
     return <SplashScreen error={initError} onRetry={() => window.location.reload()} />;
   }
 
-  return (
-    <div className="h-full w-full flex flex-col relative overflow-hidden">
-      <div className="fixed top-[-20%] right-[-10%] w-[500px] h-[500px] bg-orange-200/20 rounded-full blur-[100px] pointer-events-none" />
-      <div className="fixed bottom-[-10%] left-[-10%] w-[400px] h-[400px] bg-yellow-200/20 rounded-full blur-[80px] pointer-events-none" />
+  // --- Theme Background Logic ---
+  const bgGradientClass = {
+    orange: 'from-orange-50/50 via-white to-amber-50/50',
+    blue: 'from-blue-50/50 via-white to-cyan-50/50',
+    rose: 'from-rose-50/50 via-white to-pink-50/50',
+    violet: 'from-violet-50/50 via-white to-purple-50/50',
+    emerald: 'from-emerald-50/50 via-white to-teal-50/50',
+    amber: 'from-amber-50/50 via-white to-yellow-50/50',
+  }[themeColor] || 'from-orange-50/50 via-white to-amber-50/50';
 
-      {/* Header with Enhanced Safe Area Padding */}
+  return (
+    <div className={`h-full w-full flex flex-col relative overflow-hidden bg-gradient-to-br ${bgGradientClass}`}>
+      {/* Background Orbs - Tinted by Theme */}
+      <div className={`fixed top-[-20%] right-[-10%] w-[500px] h-[500px] bg-${themeColor}-200/20 rounded-full blur-[100px] pointer-events-none`} />
+      <div className={`fixed bottom-[-10%] left-[-10%] w-[400px] h-[400px] bg-${themeColor === 'orange' ? 'yellow' : themeColor}-200/20 rounded-full blur-[80px] pointer-events-none`} />
+
+      {/* Header */}
       <header className="px-6 pb-5 z-20 flex items-center justify-between flex-none backdrop-blur-md bg-white/40 border-b border-white/50" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 1.75rem)' }}>
         <div className="flex items-center gap-3">
-          <div className="p-2 rounded-xl bg-white shadow-sm border border-orange-100 text-orange-500">
+          <div className={`p-2 rounded-xl bg-white shadow-sm border border-${themeColor}-100 text-${themeColor}-500`}>
             {isGenericTool ? <Hash size={20} /> : <Dices size={20} />}
           </div>
           <div className="flex flex-col">
@@ -362,28 +463,36 @@ function App() {
         </div>
         
         <div className="flex items-center gap-3 sm:gap-4">
-          <button
-             onClick={() => setShowSettings(true)}
-             className="p-2 text-slate-500 hover:text-orange-600 bg-white/80 rounded-lg transition-all border border-transparent hover:border-orange-100"
-          >
-            <UserCog size={18} />
-          </button>
+          {!isSelectionMode && (
+            <button
+              onClick={() => setShowSettings(true)}
+              className={`p-2 text-slate-500 hover:text-${themeColor}-600 bg-white/80 rounded-lg transition-all border border-transparent hover:border-${themeColor}-100`}
+            >
+              <UserCog size={18} />
+            </button>
+          )}
 
-          {currentTab === 'templates' && (
+          {currentTab === 'templates' && !isSelectionMode && (
             <button 
               onClick={handleCreateNew}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-500 text-white rounded-lg text-xs font-bold shadow-lg shadow-orange-200 hover:shadow-xl hover:bg-orange-600 transition-all active:scale-95"
+              className={`flex items-center gap-1.5 px-3 py-1.5 bg-${themeColor}-500 text-white rounded-lg text-xs font-bold shadow-lg shadow-${themeColor}-200 hover:shadow-xl hover:bg-${themeColor}-600 transition-all active:scale-95`}
             >
               <Plus size={16} />
               <span>{t.new}</span>
             </button>
+          )}
+          
+          {isSelectionMode && (
+            <div className="px-3 py-1.5 bg-slate-800 text-white rounded-lg text-xs font-bold animate-fade-in">
+              已选 {selectedTemplateIds.size} 项
+            </div>
           )}
 
           {currentTab === 'execute' && (
              <div className="flex gap-3">
                <button 
                  onClick={() => setShowHistory(true)}
-                 className="p-2 text-slate-500 hover:text-orange-600 bg-white/80 rounded-lg transition-all border border-transparent hover:border-orange-100"
+                 className={`p-2 text-slate-500 hover:text-${themeColor}-600 bg-white/80 rounded-lg transition-all border border-transparent hover:border-${themeColor}-100`}
                  title="历史"
                >
                  <History size={18} />
@@ -391,10 +500,11 @@ function App() {
                {!isGenericTool && activeTemplate && (
                  <button 
                    onClick={() => handleEdit(activeTemplate)}
-                   className="p-2 text-slate-500 hover:text-orange-600 bg-white/80 rounded-lg transition-all border border-transparent hover:border-orange-100"
+                   className={`p-2 text-slate-500 hover:text-${themeColor}-600 bg-white/80 rounded-lg transition-all border border-transparent hover:border-${themeColor}-100`}
                    title="编辑"
                  >
-                   <Settings2 size={18} />
+                   <span className="sr-only">编辑</span>
+                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
                  </button>
                )}
              </div>
@@ -411,21 +521,21 @@ function App() {
                   <div className="bg-white/80 backdrop-blur-md p-1.5 rounded-xl border border-white flex gap-2 shadow-sm overflow-x-auto max-w-full scrollbar-hide">
                     <button
                       onClick={() => setDisplayMode('wheel')}
-                      className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all whitespace-nowrap flex-none ${displayMode === 'wheel' ? 'bg-orange-500 text-white shadow-md' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}
+                      className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all whitespace-nowrap flex-none ${displayMode === 'wheel' ? `bg-${themeColor}-500 text-white shadow-md` : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}
                     >
                       <Disc size={18} />
                       <span className="text-xs font-bold">{t.wheel}</span>
                     </button>
                     <button
                       onClick={() => setDisplayMode('roller')}
-                      className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all whitespace-nowrap flex-none ${displayMode === 'roller' ? 'bg-orange-500 text-white shadow-md' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}
+                      className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all whitespace-nowrap flex-none ${displayMode === 'roller' ? `bg-${themeColor}-500 text-white shadow-md` : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}
                     >
                       <Monitor size={18} />
                       <span className="text-xs font-bold">{t.roller}</span>
                     </button>
                     <button
                       onClick={() => setDisplayMode('number')}
-                      className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all whitespace-nowrap flex-none ${displayMode === 'number' ? 'bg-orange-500 text-white shadow-md' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}
+                      className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all whitespace-nowrap flex-none ${displayMode === 'number' ? `bg-${themeColor}-500 text-white shadow-md` : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}
                     >
                       <Hash size={18} />
                       <span className="text-xs font-bold">{t.number}</span>
@@ -435,15 +545,15 @@ function App() {
 
                 {(!activeTemplate && !isGenericTool) ? (
                   <div className="flex-1 flex flex-col items-center justify-center text-center py-10 animate-fade-in">
-                    <div className="w-24 h-24 bg-white rounded-[32px] flex items-center justify-center mb-6 shadow-2xl shadow-orange-100 border border-orange-50/50">
-                      <Dices size={48} className="text-orange-200" />
+                    <div className={`w-24 h-24 bg-white rounded-[32px] flex items-center justify-center mb-6 shadow-2xl shadow-${themeColor}-100 border border-${themeColor}-50/50`}>
+                      <Dices size={48} className={`text-${themeColor}-200`} />
                     </div>
                     <h2 className="text-xl font-black text-slate-800 mb-2">{t.ready}</h2>
                     <p className="text-slate-400 mb-8 max-w-[240px] mx-auto text-xs leading-relaxed">{t.emptyDesc}</p>
                     <div className="flex flex-col gap-3 w-full max-w-xs px-6">
                         <button 
                           onClick={handleCreateNew} 
-                          className="w-full px-6 py-3 bg-orange-500 text-white rounded-xl font-bold shadow-xl shadow-orange-200 hover:bg-orange-600 transition-all hover:-translate-y-1 text-sm"
+                          className={`w-full px-6 py-3 bg-${themeColor}-500 text-white rounded-xl font-bold shadow-xl shadow-${themeColor}-200 hover:bg-${themeColor}-600 transition-all hover:-translate-y-1 text-sm`}
                         >
                           {t.createFirst}
                         </button>
@@ -468,125 +578,163 @@ function App() {
                 <TemplateCard
                   key={template.id}
                   template={template}
+                  themeColor={themeColor}
                   onSelect={handleSelectTemplate}
                   onEdit={handleEdit}
-                  onDelete={handleDeleteRequest}
                   onManualSelect={handleOpenManualSelect}
                   onEditNote={handleOpenNoteModal}
+                  isSelectionMode={isSelectionMode}
+                  isSelected={selectedTemplateIds.has(template.id)}
+                  onLongPress={handleLongPress}
+                  onToggleSelect={handleToggleSelect}
                 />
               ))}
               
-              <button
-                onClick={handleCreateNew}
-                className="group relative w-full h-[140px] rounded-2xl border-2 border-dashed border-slate-200 hover:border-orange-400 bg-white/40 hover:bg-orange-50/30 transition-all duration-300 cursor-pointer flex flex-col items-center justify-center gap-2 text-slate-400 hover:text-orange-600"
-              >
-                <div className="p-2 rounded-lg bg-slate-100/50 group-hover:bg-orange-100 transition-colors">
-                  <Plus size={20} />
-                </div>
-                <span className="font-bold text-xs tracking-wide">{t.addTopic}</span>
-              </button>
+              {!isSelectionMode && (
+                <button
+                  onClick={handleCreateNew}
+                  className={`group relative w-full h-auto min-h-[110px] rounded-2xl border-2 border-dashed border-slate-200 hover:border-${themeColor}-400 bg-white/40 hover:bg-${themeColor}-50/30 transition-all duration-300 cursor-pointer flex flex-col items-center justify-center gap-2 text-slate-400 hover:text-${themeColor}-600`}
+                >
+                  <div className={`p-2 rounded-lg bg-slate-100/50 group-hover:bg-${themeColor}-100 transition-colors`}>
+                    <Plus size={20} />
+                  </div>
+                  <span className="font-bold text-xs tracking-wide">{t.addTopic}</span>
+                </button>
+              )}
             </div>
           )}
         </div>
       </main>
 
+      {/* Nav Bar / Bulk Actions */}
       <div className="fixed bottom-0 left-0 right-0 flex justify-center z-40 pointer-events-none px-6" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 1.5rem)' }}>
-        <nav className="bg-white/90 backdrop-blur-xl px-1.5 py-1.5 rounded-[20px] flex items-center shadow-[0_10px_40px_rgba(0,0,0,0.1)] pointer-events-auto gap-1 border border-slate-200/50 max-w-sm w-full">
-          <button 
-            onClick={() => setCurrentTab('execute')}
-            className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-[14px] transition-all duration-300 ${currentTab === 'execute' ? 'bg-orange-500 text-white shadow-lg shadow-orange-200' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}
-          >
-             <PlayCircle size={18} />
-            <span className="text-xs font-black tracking-wide">{t.startDecide}</span>
-          </button>
-          
-          <button 
-            onClick={() => setCurrentTab('templates')}
-            className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-[14px] transition-all duration-300 ${currentTab === 'templates' ? 'bg-orange-500 text-white shadow-lg shadow-orange-200' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}
-          >
-            <LayoutGrid size={18} />
-            <span className="text-xs font-black tracking-wide">{t.library}</span>
-          </button>
-        </nav>
+        {isSelectionMode ? (
+          <div className="bg-white/90 backdrop-blur-xl px-1.5 py-1.5 rounded-[20px] flex items-center shadow-[0_10px_40px_rgba(0,0,0,0.1)] pointer-events-auto gap-1 max-w-sm w-full border border-slate-200/50 animate-modal-enter">
+            <button 
+              onClick={handleExitSelectionMode}
+              className="flex-1 flex items-center justify-center gap-2 py-3 rounded-[14px] bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors"
+            >
+               <X size={18} />
+              <span className="text-xs font-black tracking-wide">{t.cancel}</span>
+            </button>
+            <button 
+              onClick={handleBulkDeleteRequest}
+              disabled={selectedTemplateIds.size === 0}
+              className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-[14px] transition-all duration-300 ${
+                selectedTemplateIds.size > 0 
+                  ? 'bg-rose-500 text-white shadow-lg shadow-rose-200 hover:bg-rose-600' 
+                  : 'bg-slate-50 text-slate-300 cursor-not-allowed'
+              }`}
+            >
+              <Trash2 size={18} />
+              <span className="text-xs font-black tracking-wide">{t.confirmDelete} ({selectedTemplateIds.size})</span>
+            </button>
+          </div>
+        ) : (
+          <nav className="bg-white/90 backdrop-blur-xl px-1.5 py-1.5 rounded-[20px] flex items-center shadow-[0_10px_40px_rgba(0,0,0,0.1)] pointer-events-auto gap-1 border border-slate-200/50 max-w-sm w-full">
+            <button 
+              onClick={() => setCurrentTab('execute')}
+              className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-[14px] transition-all duration-300 ${currentTab === 'execute' ? `bg-${themeColor}-500 text-white shadow-lg shadow-${themeColor}-200` : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}
+            >
+               <PlayCircle size={18} />
+              <span className="text-xs font-black tracking-wide">{t.startDecide}</span>
+            </button>
+            
+            <button 
+              onClick={() => setCurrentTab('templates')}
+              className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-[14px] transition-all duration-300 ${currentTab === 'templates' ? `bg-${themeColor}-500 text-white shadow-lg shadow-${themeColor}-200` : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}
+            >
+              <LayoutGrid size={18} />
+              <span className="text-xs font-black tracking-wide">{t.library}</span>
+            </button>
+          </nav>
+        )}
       </div>
 
-      {showEditor && (
-        <TemplateEditor
-          initialTemplate={editingTemplate}
-          onSave={handleSaveTemplate}
-          onCancel={() => setShowEditor(false)}
-          onDelete={handleDeleteRequest}
+      <Suspense fallback={null}>
+        {showEditor && (
+          <TemplateEditor
+            initialTemplate={editingTemplate}
+            themeColor={themeColor}
+            onSave={handleSaveTemplate}
+            onCancel={() => setShowEditor(false)}
+            onDelete={handleDeleteRequest}
+          />
+        )}
+        
+        {manualSelectTemplate && (
+          <OptionPickerModal
+            template={manualSelectTemplate}
+            onSelect={handleManualOptionSelect}
+            onClose={() => setManualSelectTemplate(null)}
+          />
+        )}
+
+        {noteModal.show && (
+          <NoteInputModal
+            initialNote={noteModal.initialNote}
+            themeColor={themeColor}
+            onSave={handleSaveNote}
+            onClose={() => setNoteModal({ show: false, templateId: null, initialNote: '' })}
+          />
+        )}
+
+        {showSettings && (
+          <SettingsModal
+            settings={settings}
+            onSave={setSettings}
+            onClose={() => setShowSettings(false)}
+            onResetData={handleResetApp}
+            onExport={handleExportData}
+            onImport={handleImportData}
+          />
+        )}
+
+        {spinResult && (
+          <ResultModal
+            result={spinResult}
+            themeColor={themeColor}
+            onClose={() => setSpinResult(null)}
+            onSpinAgain={() => setSpinResult(null)}
+          />
+        )}
+
+        {showHistory && (
+          <HistoryModal 
+            history={history}
+            onClose={() => setShowHistory(false)}
+            onClear={() => setClearHistoryConfirm(true)}
+            settings={settings}
+          />
+        )}
+
+        <ConfirmModal
+          isOpen={deleteConfirm.show}
+          title={deleteConfirm.isBulk ? t.bulkDeleteTitle : t.deleteTitle}
+          message={deleteConfirm.isBulk ? t.bulkDeleteMsg : t.deleteMsg}
+          confirmText={t.confirmDelete}
+          onConfirm={handleConfirmDelete}
+          onCancel={() => setDeleteConfirm({ show: false, templateId: null, isBulk: false })}
         />
-      )}
-      
-      {manualSelectTemplate && (
-        <OptionPickerModal
-          template={manualSelectTemplate}
-          onSelect={handleManualOptionSelect}
-          onClose={() => setManualSelectTemplate(null)}
+
+        <ConfirmModal
+          isOpen={restoreConfirm}
+          title={t.restoreTitle}
+          message={t.restoreMsg}
+          confirmText={t.confirmRestore}
+          onConfirm={handleConfirmRestoreDefaults}
+          onCancel={() => setRestoreConfirm(false)}
         />
-      )}
 
-      {noteModal.show && (
-        <NoteInputModal
-          initialNote={noteModal.initialNote}
-          onSave={handleSaveNote}
-          onClose={() => setNoteModal({ show: false, templateId: null, initialNote: '' })}
+        <ConfirmModal
+          isOpen={clearHistoryConfirm}
+          title={t.clearHistoryTitle}
+          message={t.clearHistoryMsg}
+          confirmText={t.confirmClear}
+          onConfirm={handleConfirmClearHistory}
+          onCancel={() => setClearHistoryConfirm(false)}
         />
-      )}
-
-      {showSettings && (
-        <SettingsModal
-          settings={settings}
-          onSave={setSettings}
-          onClose={() => setShowSettings(false)}
-          onResetData={handleResetApp}
-        />
-      )}
-
-      {spinResult && (
-        <ResultModal
-          result={spinResult}
-          onClose={() => setSpinResult(null)}
-          onSpinAgain={() => setSpinResult(null)}
-        />
-      )}
-
-      {showHistory && (
-        <HistoryModal 
-          history={history}
-          onClose={() => setShowHistory(false)}
-          onClear={() => setClearHistoryConfirm(true)}
-          settings={settings}
-        />
-      )}
-
-      <ConfirmModal
-        isOpen={deleteConfirm.show}
-        title={t.deleteTitle}
-        message={t.deleteMsg}
-        confirmText={t.confirmDelete}
-        onConfirm={handleConfirmDelete}
-        onCancel={() => setDeleteConfirm({ show: false, templateId: null })}
-      />
-
-      <ConfirmModal
-        isOpen={restoreConfirm}
-        title={t.restoreTitle}
-        message={t.restoreMsg}
-        confirmText={t.confirmRestore}
-        onConfirm={handleConfirmRestoreDefaults}
-        onCancel={() => setRestoreConfirm(false)}
-      />
-
-      <ConfirmModal
-        isOpen={clearHistoryConfirm}
-        title={t.clearHistoryTitle}
-        message={t.clearHistoryMsg}
-        confirmText={t.confirmClear}
-        onConfirm={handleConfirmClearHistory}
-        onCancel={() => setClearHistoryConfirm(false)}
-      />
+      </Suspense>
     </div>
   );
 }
