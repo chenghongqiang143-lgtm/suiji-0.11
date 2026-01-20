@@ -1,4 +1,9 @@
 
+export interface Category {
+  id: string;
+  name: string;
+}
+
 export interface Template {
   id: string;
   title: string;
@@ -9,6 +14,7 @@ export interface Template {
   lastSelectedOption?: string;
   lastSelectedNote?: string;
   optionNotes?: Record<string, string>; // Key: option text, Value: note content
+  categoryId?: string;
 }
 
 export type WheelSegment = {

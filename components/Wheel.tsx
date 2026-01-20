@@ -7,7 +7,7 @@ interface WheelProps {
   onSpinEnd: (winner: string) => void;
 }
 
-const Wheel: React.FC<WheelProps> = ({ options, colorTheme = 'default', onSpinEnd }) => {
+const Wheel: React.FC<WheelProps> = ({ options, colorTheme = 'berry', onSpinEnd }) => {
   const rotateRef = useRef<HTMLDivElement>(null);
   const [isSpinning, setIsSpinning] = useState(false);
   const audioCtxRef = useRef<AudioContext | null>(null);
@@ -21,7 +21,7 @@ const Wheel: React.FC<WheelProps> = ({ options, colorTheme = 'default', onSpinEn
   const lastTickIndexRef = useRef<number>(-1);
 
   // Resolve colors based on theme
-  const themeColors = COLOR_THEMES[colorTheme as keyof typeof COLOR_THEMES]?.colors || COLOR_THEMES.default.colors;
+  const themeColors = COLOR_THEMES[colorTheme as keyof typeof COLOR_THEMES]?.colors || COLOR_THEMES.berry.colors;
 
   const initAudio = () => {
     if (!audioCtxRef.current) {

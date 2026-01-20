@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { Template, ThemeColor } from '../types';
-import { Edit, MousePointerClick, Trophy, StickyNote, CheckSquare, Square, Plus, Check, GripVertical } from 'lucide-react';
+import { Edit, MousePointerClick, Trophy, StickyNote, CheckSquare, Square, Plus, Check } from 'lucide-react';
 import { COLOR_THEMES } from '../constants';
 
 interface TemplateCardProps {
@@ -16,11 +16,6 @@ interface TemplateCardProps {
   isSelected: boolean;
   onLongPress: (t: Template) => void;
   onToggleSelect: (t: Template) => void;
-  
-  // Drag and Drop
-  onDragStart?: (e: React.DragEvent, t: Template) => void;
-  onDragOver?: (e: React.DragEvent, t: Template) => void;
-  onDragEnd?: (e: React.DragEvent) => void;
 }
 
 const TemplateCard: React.FC<TemplateCardProps> = ({ 
@@ -33,12 +28,9 @@ const TemplateCard: React.FC<TemplateCardProps> = ({
   isSelectionMode,
   isSelected,
   onLongPress,
-  onToggleSelect,
-  onDragStart,
-  onDragOver,
-  onDragEnd
+  onToggleSelect
 }) => {
-  const wheelTheme = COLOR_THEMES[template.colorTheme as keyof typeof COLOR_THEMES] || COLOR_THEMES.default;
+  const wheelTheme = COLOR_THEMES[template.colorTheme as keyof typeof COLOR_THEMES] || COLOR_THEMES.berry;
   const accentColor = wheelTheme.colors[0];
   const timerRef = useRef<any>(null);
   const [isPressing, setIsPressing] = useState(false);
@@ -108,11 +100,6 @@ const TemplateCard: React.FC<TemplateCardProps> = ({
       onTouchEnd={cancelPress}
       onTouchMove={cancelPress}
       onContextMenu={(e) => e.preventDefault()}
-      
-      draggable={isSelectionMode}
-      onDragStart={(e) => onDragStart && onDragStart(e, template)}
-      onDragOver={(e) => onDragOver && onDragOver(e, template)}
-      onDragEnd={onDragEnd}
     >
       {/* Accent Indicator (Hidden in Selection Mode) */}
       {!isSelectionMode && (
@@ -120,13 +107,6 @@ const TemplateCard: React.FC<TemplateCardProps> = ({
           className={`absolute left-0 top-4 bottom-4 w-1 rounded-r-full transition-all duration-300 opacity-60 group-hover:opacity-100`}
           style={{ backgroundColor: accentColor }}
         />
-      )}
-
-      {/* Drag Handle Indicator (Selection Mode Only) */}
-      {isSelectionMode && (
-         <div className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-300 cursor-grab active:cursor-grabbing">
-            <GripVertical size={20} />
-         </div>
       )}
 
       {/* Selection Checkbox Overlay */}
@@ -143,7 +123,7 @@ const TemplateCard: React.FC<TemplateCardProps> = ({
       )}
 
       {/* Main Content Area */}
-      <div className={`pl-3 flex flex-col gap-3 ${isSelectionMode ? 'ml-4' : ''} transition-all`}>
+      <div className={`pl-3 flex flex-col gap-3 transition-all`}>
         
         {/* Header Section */}
         <div className="flex items-start justify-between gap-2">

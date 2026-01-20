@@ -1,11 +1,11 @@
-import React, { useState, useEffect, Suspense } from 'react';
-import { Plus, Dices, LayoutGrid, PlayCircle, Disc, Monitor, History, RotateCcw, UserCog, Hash, Loader2, Trash2, X } from 'lucide-react';
-import { Template, HistoryItem, AppSettings, ThemeColor } from './types';
-import { DEFAULT_TEMPLATES } from './constants';
+import React, { useState, useEffect, Suspense, useRef } from 'react';
+import { Plus, Dices, LayoutGrid, PlayCircle, Disc, Monitor, History, RotateCcw, UserCog, Hash, Loader2, Trash2, X, FolderInput } from 'lucide-react';
+import { Template, HistoryItem, AppSettings, Category } from './types';
+import { DEFAULT_TEMPLATES, DEFAULT_CATEGORIES } from './constants';
 import TemplateCard from './components/TemplateCard';
 import SplashScreen from './components/SplashScreen';
 
-// Lazy load heavy components for batch loading
+// Lazy load heavy components
 const TemplateEditor = React.lazy(() => import('./components/TemplateEditor'));
 const OptionPickerModal = React.lazy(() => import('./components/OptionPickerModal'));
 const NoteInputModal = React.lazy(() => import('./components/NoteInputModal'));
@@ -16,6 +16,8 @@ const ResultModal = React.lazy(() => import('./components/ResultModal'));
 const HistoryModal = React.lazy(() => import('./components/HistoryModal'));
 const ConfirmModal = React.lazy(() => import('./components/ConfirmModal'));
 const SettingsModal = React.lazy(() => import('./components/SettingsModal'));
+const CategoryEditorModal = React.lazy(() => import('./components/CategoryEditorModal'));
+const MoveToCategoryModal = React.lazy(() => import('./components/MoveToCategoryModal'));
 
 type DisplayMode = 'wheel' | 'roller' | 'number';
 
@@ -30,7 +32,6 @@ function App() {
       const saved = localStorage.getItem('spinDecide_settings');
       if (saved) return JSON.parse(saved);
     } catch (e) { console.error(e); }
-    // Default theme color is orange
     return { language: 'zh', themeColor: 'orange' };
   });
 
@@ -40,14 +41,44 @@ function App() {
     localStorage.setItem('spinDecide_settings', JSON.stringify(settings));
   }, [settings]);
 
-  // --- Data ---
+  // --- Data: Categories & Templates ---
+  const [categories, setCategories] = useState<Category[]>(() => {
+    try {
+      const saved = localStorage.getItem('spinDecide_categories');
+      if (saved) return JSON.parse(saved);
+    } catch (e) { console.error(e); }
+    return DEFAULT_CATEGORIES;
+  });
+  
+  // Set initial active category
+  const [activeCategoryId, setActiveCategoryId] = useState<string>(() => {
+     return categories.length > 0 ? categories[0].id : 'daily';
+  });
+
   const [templates, setTemplates] = useState<Template[]>(() => {
     try {
       const saved = localStorage.getItem('spinDecide_templates');
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+         let loaded: Template[] = JSON.parse(saved);
+         // Migration: Assign a category if missing
+         loaded = loaded.map(t => ({
+             ...t,
+             categoryId: t.categoryId || DEFAULT_CATEGORIES[0].id
+         }));
+         return loaded;
+      }
     } catch (e) { console.error(e); }
     return DEFAULT_TEMPLATES;
   });
+
+  // Persist Categories & Templates
+  useEffect(() => {
+    localStorage.setItem('spinDecide_categories', JSON.stringify(categories));
+  }, [categories]);
+
+  useEffect(() => {
+    localStorage.setItem('spinDecide_templates', JSON.stringify(templates));
+  }, [templates]);
 
   const [history, setHistory] = useState<HistoryItem[]>(() => {
     try {
@@ -61,6 +92,13 @@ function App() {
      return templates.length > 0 ? templates[0].id : null;
   });
 
+  // Ensure active category is valid (fallback if deleted)
+  useEffect(() => {
+     if (!categories.find(c => c.id === activeCategoryId) && categories.length > 0) {
+         setActiveCategoryId(categories[0].id);
+     }
+  }, [categories]);
+
   // --- UI State ---
   const [currentTab, setCurrentTab] = useState<'execute' | 'templates'>('execute');
   const [displayMode, setDisplayMode] = useState<DisplayMode>('wheel');
@@ -70,11 +108,15 @@ function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<Template | null>(null);
   
+  // Category UI State
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [showCategoryModal, setShowCategoryModal] = useState(false); // For add/edit category
+  const [categoryPressTimer, setCategoryPressTimer] = useState<any>(null);
+  
   // Selection / Bulk Action State
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedTemplateIds, setSelectedTemplateIds] = useState<Set<string>>(new Set());
-  // Drag State
-  const [draggedTemplate, setDraggedTemplate] = useState<Template | null>(null);
+  const [showMoveModal, setShowMoveModal] = useState(false);
 
   // Manual Selection State
   const [manualSelectTemplate, setManualSelectTemplate] = useState<Template | null>(null);
@@ -110,23 +152,6 @@ function App() {
     return () => clearTimeout(timeoutId);
   }, []);
 
-  // --- Effects ---
-  useEffect(() => {
-    localStorage.setItem('spinDecide_templates', JSON.stringify(templates));
-  }, [templates]);
-
-  useEffect(() => {
-    localStorage.setItem('spinDecide_history', JSON.stringify(history));
-  }, [history]);
-
-  useEffect(() => {
-    if (templates.length > 0 && !templates.find(t => t.id === activeTemplateId)) {
-      setActiveTemplateId(templates[0].id);
-    } else if (templates.length === 0) {
-      setActiveTemplateId(null);
-    }
-  }, [templates, activeTemplateId]);
-
   // --- Handlers ---
   const activeTemplate = templates.find(t => t.id === activeTemplateId);
 
@@ -148,6 +173,65 @@ function App() {
     setEditingTemplate(template);
     setShowEditor(true);
   };
+
+  // --- Category Logic ---
+  const handleCategoryPressStart = (cat: Category) => {
+    const timer = setTimeout(() => {
+      setEditingCategory(cat);
+      setShowCategoryModal(true);
+      if (window.navigator && window.navigator.vibrate) window.navigator.vibrate(50);
+    }, 500);
+    setCategoryPressTimer(timer);
+  };
+  const handleCategoryPressEnd = () => {
+    if (categoryPressTimer) clearTimeout(categoryPressTimer);
+  };
+
+  const handleSaveCategory = (name: string) => {
+    if (editingCategory) {
+      // Edit
+      setCategories(prev => prev.map(c => c.id === editingCategory.id ? { ...c, name } : c));
+    } else {
+      // Add
+      const newCat = { id: Date.now().toString(), name };
+      setCategories(prev => [...prev, newCat]);
+      setActiveCategoryId(newCat.id); // Switch to new
+    }
+    setShowCategoryModal(false);
+    setEditingCategory(null);
+  };
+
+  const handleDeleteCategory = () => {
+    if (!editingCategory) return;
+    if (categories.length <= 1) {
+      alert("至少保留一个分类");
+      return;
+    }
+    
+    // Find backup category (first one that isn't the deleted one)
+    const backupCategory = categories.find(c => c.id !== editingCategory.id) || categories[0];
+    
+    // Move items
+    setTemplates(prev => prev.map(t => 
+      t.categoryId === editingCategory.id ? { ...t, categoryId: backupCategory.id } : t
+    ));
+
+    // Remove category
+    setCategories(prev => prev.filter(c => c.id !== editingCategory.id));
+    setActiveCategoryId(backupCategory.id);
+    
+    setShowCategoryModal(false);
+    setEditingCategory(null);
+  };
+  
+  // --- Move Items Logic ---
+  const handleMoveSelected = (targetCatId: string) => {
+    setTemplates(prev => prev.map(t => 
+        selectedTemplateIds.has(t.id) ? { ...t, categoryId: targetCatId } : t
+    ));
+    setShowMoveModal(false);
+    handleExitSelectionMode();
+  };
   
   const handleOpenManualSelect = (template: Template) => {
     setManualSelectTemplate(template);
@@ -156,11 +240,7 @@ function App() {
   const handleOpenNoteModal = (template: Template) => {
     const currentOption = template.lastSelectedOption || '';
     const currentNote = template.lastSelectedNote || '';
-    
-    // Check if the current note matches the saved persistent note for this option
     const savedNote = template.optionNotes?.[currentOption];
-    
-    // Prioritize existing note (could be modified), then saved note
     const noteToShow = currentNote || savedNote || '';
 
     setNoteModal({
@@ -179,10 +259,8 @@ function App() {
           
           if (currentOption) {
             if (persist) {
-              // Save to persistent storage
               newOptionNotes[currentOption] = note;
             } else {
-              // Remove from persistent storage if unchecked
               delete newOptionNotes[currentOption];
             }
           }
@@ -229,34 +307,6 @@ function App() {
     setSelectedTemplateIds(new Set());
   };
 
-  // --- Drag and Drop Handlers ---
-  const handleDragStart = (e: React.DragEvent, template: Template) => {
-    setDraggedTemplate(template);
-    // Set drag effect
-    e.dataTransfer.effectAllowed = 'move';
-    // Optional: set ghost image if needed, for now default is fine
-  };
-
-  const handleDragOver = (e: React.DragEvent, targetTemplate: Template) => {
-    e.preventDefault(); // Necessary to allow dropping
-    if (!draggedTemplate || draggedTemplate.id === targetTemplate.id) return;
-
-    // Perform swap logic
-    const fromIndex = templates.findIndex(t => t.id === draggedTemplate.id);
-    const toIndex = templates.findIndex(t => t.id === targetTemplate.id);
-
-    if (fromIndex !== -1 && toIndex !== -1) {
-      const newTemplates = [...templates];
-      const [movedItem] = newTemplates.splice(fromIndex, 1);
-      newTemplates.splice(toIndex, 0, movedItem);
-      setTemplates(newTemplates);
-    }
-  };
-
-  const handleDragEnd = (e: React.DragEvent) => {
-    setDraggedTemplate(null);
-  };
-
   const handleDeleteRequest = (id: string) => {
     setDeleteConfirm({ show: true, templateId: id, isBulk: false });
   };
@@ -283,6 +333,8 @@ function App() {
   };
 
   const handleConfirmRestoreDefaults = () => {
+    setCategories(DEFAULT_CATEGORIES);
+    setActiveCategoryId(DEFAULT_CATEGORIES[0].id);
     setTemplates(DEFAULT_TEMPLATES);
     setActiveTemplateId(DEFAULT_TEMPLATES[0].id);
     setCurrentTab('execute');
@@ -321,12 +373,10 @@ function App() {
     if (targetTemplateId && displayMode !== 'number') {
       setTemplates(prev => prev.map(t => {
         if (t.id === targetTemplateId) {
-          // Check if there is a persistent note for this result option
           const persistentNote = t.optionNotes?.[result];
           return { 
             ...t, 
             lastSelectedOption: result, 
-            // Automatically load persistent note if exists, otherwise clear
             lastSelectedNote: persistentNote || undefined 
           };
         }
@@ -368,13 +418,14 @@ function App() {
   };
 
   const handleExportData = () => {
-    const data = { version: 1, timestamp: Date.now(), templates, history, settings };
+    const data = { version: 2, timestamp: Date.now(), templates, history, settings, categories };
     return JSON.stringify(data, null, 2);
   };
 
   const handleImportData = (jsonStr: string) => {
     try {
       const data = JSON.parse(jsonStr);
+      if (data.categories && Array.isArray(data.categories)) setCategories(data.categories);
       if (data.templates && Array.isArray(data.templates)) setTemplates(data.templates);
       if (data.history && Array.isArray(data.history)) setHistory(data.history);
       if (data.settings) setSettings(data.settings);
@@ -418,6 +469,7 @@ function App() {
     confirmClear: settings.language === 'zh' ? '确认清空' : 'Clear',
     genericTitle: settings.language === 'zh' ? '常用工具' : 'Tools',
     cancel: settings.language === 'zh' ? '取消' : 'Cancel',
+    move: settings.language === 'zh' ? '移动到' : 'Move to',
   };
 
   const isGenericTool = displayMode === 'number';
@@ -453,6 +505,8 @@ function App() {
       </Suspense>
     );
   };
+  
+  const displayedTemplates = templates.filter(t => t.categoryId === activeCategoryId);
 
   if (!isReady) {
     return <SplashScreen error={initError} onRetry={() => window.location.reload()} />;
@@ -470,7 +524,7 @@ function App() {
 
   return (
     <div className={`h-full w-full flex flex-col relative overflow-hidden bg-gradient-to-br ${bgGradientClass}`}>
-      {/* Background Orbs - Tinted by Theme */}
+      {/* Background Orbs */}
       <div className={`fixed top-[-20%] right-[-10%] w-[500px] h-[500px] bg-${themeColor}-200/20 rounded-full blur-[100px] pointer-events-none`} />
       <div className={`fixed bottom-[-10%] left-[-10%] w-[400px] h-[400px] bg-${themeColor === 'orange' ? 'yellow' : themeColor}-200/20 rounded-full blur-[80px] pointer-events-none`} />
 
@@ -497,16 +551,6 @@ function App() {
               className={`p-2 text-slate-500 hover:text-${themeColor}-600 bg-white/80 rounded-lg transition-all border border-transparent hover:border-${themeColor}-100`}
             >
               <UserCog size={18} />
-            </button>
-          )}
-
-          {currentTab === 'templates' && !isSelectionMode && (
-            <button 
-              onClick={handleCreateNew}
-              className={`flex items-center gap-1.5 px-3 py-1.5 bg-${themeColor}-500 text-white rounded-lg text-xs font-bold shadow-lg shadow-${themeColor}-200 hover:shadow-xl hover:bg-${themeColor}-600 transition-all active:scale-95`}
-            >
-              <Plus size={16} />
-              <span>{t.new}</span>
             </button>
           )}
           
@@ -539,6 +583,36 @@ function App() {
           )}
         </div>
       </header>
+      
+      {/* Category Bar (Only visible in Templates tab) */}
+      {currentTab === 'templates' && (
+        <div className="px-4 py-2 overflow-x-auto whitespace-nowrap scrollbar-hide flex gap-2 items-center flex-none z-10 bg-white/20 backdrop-blur-sm border-b border-white/40">
+           {categories.map(cat => (
+             <button
+               key={cat.id}
+               onClick={() => setActiveCategoryId(cat.id)}
+               onMouseDown={() => handleCategoryPressStart(cat)}
+               onMouseUp={handleCategoryPressEnd}
+               onMouseLeave={handleCategoryPressEnd}
+               onTouchStart={() => handleCategoryPressStart(cat)}
+               onTouchEnd={handleCategoryPressEnd}
+               className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all border ${
+                 activeCategoryId === cat.id 
+                   ? `bg-${themeColor}-500 text-white border-${themeColor}-500 shadow-sm` 
+                   : 'bg-white/60 text-slate-500 border-transparent hover:bg-white hover:text-slate-700'
+               }`}
+             >
+               {cat.name}
+             </button>
+           ))}
+           <button
+             onClick={() => { setEditingCategory(null); setShowCategoryModal(true); }}
+             className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 text-slate-400 hover:bg-slate-200 hover:text-slate-600 transition-colors flex-none"
+           >
+             <Plus size={16} />
+           </button>
+        </div>
+      )}
 
       <main className="flex-1 overflow-y-auto px-4 sm:px-6 pb-32 pt-6 scroll-smooth">
         <div className="max-w-4xl mx-auto h-full">
@@ -580,7 +654,7 @@ function App() {
                     <p className="text-slate-400 mb-8 max-w-[240px] mx-auto text-xs leading-relaxed">{t.emptyDesc}</p>
                     <div className="flex flex-col gap-3 w-full max-w-xs px-6">
                         <button 
-                          onClick={handleCreateNew} 
+                          onClick={() => { setCurrentTab('templates'); handleCreateNew(); }} 
                           className={`w-full px-6 py-3 bg-${themeColor}-500 text-white rounded-xl font-bold shadow-xl shadow-${themeColor}-200 hover:bg-${themeColor}-600 transition-all hover:-translate-y-1 text-sm`}
                         >
                           {t.createFirst}
@@ -602,7 +676,7 @@ function App() {
               </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 animate-fade-in pb-10">
-              {templates.map(template => (
+              {displayedTemplates.map(template => (
                 <TemplateCard
                   key={template.id}
                   template={template}
@@ -615,9 +689,6 @@ function App() {
                   isSelected={selectedTemplateIds.has(template.id)}
                   onLongPress={handleLongPress}
                   onToggleSelect={handleToggleSelect}
-                  onDragStart={handleDragStart}
-                  onDragOver={handleDragOver}
-                  onDragEnd={handleDragEnd}
                 />
               ))}
               
@@ -643,10 +714,21 @@ function App() {
           <div className="bg-white/90 backdrop-blur-xl px-1.5 py-1.5 rounded-[20px] flex items-center shadow-[0_10px_40px_rgba(0,0,0,0.1)] pointer-events-auto gap-1 max-w-sm w-full border border-slate-200/50 animate-modal-enter">
             <button 
               onClick={handleExitSelectionMode}
-              className="flex-1 flex items-center justify-center gap-2 py-3 rounded-[14px] bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors"
+              className="px-4 flex items-center justify-center gap-2 py-3 rounded-[14px] bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors"
             >
                <X size={18} />
-              <span className="text-xs font-black tracking-wide">{t.cancel}</span>
+            </button>
+            <button 
+              onClick={() => setShowMoveModal(true)}
+              disabled={selectedTemplateIds.size === 0}
+              className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-[14px] transition-all duration-300 ${
+                selectedTemplateIds.size > 0 
+                  ? 'bg-slate-800 text-white shadow-lg hover:bg-slate-900' 
+                  : 'bg-slate-50 text-slate-300 cursor-not-allowed'
+              }`}
+            >
+              <FolderInput size={18} />
+              <span className="text-xs font-black tracking-wide">{t.move}</span>
             </button>
             <button 
               onClick={handleBulkDeleteRequest}
@@ -686,11 +768,33 @@ function App() {
         {showEditor && (
           <TemplateEditor
             initialTemplate={editingTemplate}
+            categories={categories}
+            initialCategoryId={activeCategoryId}
             themeColor={themeColor}
             onSave={handleSaveTemplate}
             onCancel={() => setShowEditor(false)}
             onDelete={handleDeleteRequest}
           />
+        )}
+        
+        {showCategoryModal && (
+          <CategoryEditorModal
+             category={editingCategory}
+             themeColor={themeColor}
+             onSave={handleSaveCategory}
+             onDelete={handleDeleteCategory}
+             onClose={() => { setShowCategoryModal(false); setEditingCategory(null); }}
+          />
+        )}
+
+        {showMoveModal && (
+           <MoveToCategoryModal
+              categories={categories}
+              themeColor={themeColor}
+              count={selectedTemplateIds.size}
+              onSelect={handleMoveSelected}
+              onClose={() => setShowMoveModal(false)}
+           />
         )}
         
         {manualSelectTemplate && (

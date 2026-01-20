@@ -1,20 +1,42 @@
 import React, { useState, useEffect } from 'react';
-import { Template, ThemeColor } from '../types';
+import { Template, ThemeColor, Category } from '../types';
 import { COLOR_THEMES } from '../constants';
 import { X, Plus, Trash2, Save } from 'lucide-react';
 
 interface TemplateEditorProps {
   initialTemplate?: Template | null;
+  categories: Category[];
+  initialCategoryId?: string;
   themeColor?: ThemeColor;
   onSave: (template: Template) => void;
   onCancel: () => void;
   onDelete?: (id: string) => void;
 }
 
-const TemplateEditor: React.FC<TemplateEditorProps> = ({ initialTemplate, themeColor = 'orange', onSave, onCancel, onDelete }) => {
+const TemplateEditor: React.FC<TemplateEditorProps> = ({ 
+  initialTemplate, 
+  categories, 
+  initialCategoryId, 
+  themeColor = 'orange', 
+  onSave, 
+  onCancel, 
+  onDelete 
+}) => {
   const [title, setTitle] = useState(initialTemplate?.title || '');
   const [options, setOptions] = useState<string[]>(initialTemplate?.options || ['', '', '']);
-  const [colorTheme, setColorTheme] = useState<string>(initialTemplate?.colorTheme || 'default');
+  
+  // Ensure valid theme fallback since 'default' was removed
+  const getInitialTheme = () => {
+    if (initialTemplate?.colorTheme && COLOR_THEMES[initialTemplate.colorTheme as keyof typeof COLOR_THEMES]) {
+      return initialTemplate.colorTheme;
+    }
+    return 'berry';
+  };
+  const [colorTheme, setColorTheme] = useState<string>(getInitialTheme());
+
+  const [categoryId, setCategoryId] = useState<string>(
+    initialTemplate?.categoryId || initialCategoryId || (categories.length > 0 ? categories[0].id : '')
+  );
 
   // Handle Back Gesture
   useEffect(() => {
@@ -68,6 +90,7 @@ const TemplateEditor: React.FC<TemplateEditorProps> = ({ initialTemplate, themeC
       title,
       options: validOptions,
       colorTheme,
+      categoryId,
       isDefault: false, // Edited templates are no longer default protected
     };
 
@@ -116,6 +139,29 @@ const TemplateEditor: React.FC<TemplateEditorProps> = ({ initialTemplate, themeC
                 placeholder="例如：周末去哪儿玩？"
                 className={`w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-${themeColor}-500/20 focus:border-${themeColor}-500 transition-all font-medium text-slate-800`}
               />
+            </div>
+          </div>
+
+          {/* Category Section */}
+          <div className="space-y-2">
+             <label className="text-sm font-semibold text-slate-500 uppercase tracking-wider">
+              所属分类
+            </label>
+            <div className="relative">
+              <select
+                value={categoryId}
+                onChange={(e) => setCategoryId(e.target.value)}
+                className={`w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-${themeColor}-500/20 focus:border-${themeColor}-500 transition-all font-medium text-slate-800 appearance-none`}
+              >
+                {categories.map((cat) => (
+                  <option key={cat.id} value={cat.id}>
+                    {cat.name}
+                  </option>
+                ))}
+              </select>
+              <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+              </div>
             </div>
           </div>
 

@@ -7,7 +7,7 @@ interface PulseSelectorProps {
   onSpinEnd: (winner: string) => void;
 }
 
-const PulseSelector: React.FC<PulseSelectorProps> = ({ options, colorTheme = 'default', onSpinEnd }) => {
+const PulseSelector: React.FC<PulseSelectorProps> = ({ options, colorTheme = 'berry', onSpinEnd }) => {
   const [currentOption, setCurrentOption] = useState<string>(options[0]);
   const [isSpinning, setIsSpinning] = useState(false);
   const [highlight, setHighlight] = useState(false);
@@ -16,7 +16,7 @@ const PulseSelector: React.FC<PulseSelectorProps> = ({ options, colorTheme = 'de
   const timerRef = useRef<number | null>(null);
 
   // Resolve colors based on theme
-  const themeColors = COLOR_THEMES[colorTheme as keyof typeof COLOR_THEMES]?.colors || COLOR_THEMES.default.colors;
+  const themeColors = COLOR_THEMES[colorTheme as keyof typeof COLOR_THEMES]?.colors || COLOR_THEMES.berry.colors;
   const primaryColor = themeColors[0];
 
   const initAudio = () => {
