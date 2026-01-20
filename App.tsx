@@ -73,6 +73,8 @@ function App() {
   // Selection / Bulk Action State
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedTemplateIds, setSelectedTemplateIds] = useState<Set<string>>(new Set());
+  // Drag State
+  const [draggedTemplate, setDraggedTemplate] = useState<Template | null>(null);
 
   // Manual Selection State
   const [manualSelectTemplate, setManualSelectTemplate] = useState<Template | null>(null);
@@ -215,8 +217,6 @@ function App() {
       const newSet = new Set(selectedTemplateIds);
       if (newSet.has(template.id)) {
         newSet.delete(template.id);
-        // Optional: Exit selection mode if last item deselected
-        // if (newSet.size === 0) setIsSelectionMode(false);
       } else {
         newSet.add(template.id);
       }
@@ -227,6 +227,34 @@ function App() {
   const handleExitSelectionMode = () => {
     setIsSelectionMode(false);
     setSelectedTemplateIds(new Set());
+  };
+
+  // --- Drag and Drop Handlers ---
+  const handleDragStart = (e: React.DragEvent, template: Template) => {
+    setDraggedTemplate(template);
+    // Set drag effect
+    e.dataTransfer.effectAllowed = 'move';
+    // Optional: set ghost image if needed, for now default is fine
+  };
+
+  const handleDragOver = (e: React.DragEvent, targetTemplate: Template) => {
+    e.preventDefault(); // Necessary to allow dropping
+    if (!draggedTemplate || draggedTemplate.id === targetTemplate.id) return;
+
+    // Perform swap logic
+    const fromIndex = templates.findIndex(t => t.id === draggedTemplate.id);
+    const toIndex = templates.findIndex(t => t.id === targetTemplate.id);
+
+    if (fromIndex !== -1 && toIndex !== -1) {
+      const newTemplates = [...templates];
+      const [movedItem] = newTemplates.splice(fromIndex, 1);
+      newTemplates.splice(toIndex, 0, movedItem);
+      setTemplates(newTemplates);
+    }
+  };
+
+  const handleDragEnd = (e: React.DragEvent) => {
+    setDraggedTemplate(null);
   };
 
   const handleDeleteRequest = (id: string) => {
@@ -587,6 +615,9 @@ function App() {
                   isSelected={selectedTemplateIds.has(template.id)}
                   onLongPress={handleLongPress}
                   onToggleSelect={handleToggleSelect}
+                  onDragStart={handleDragStart}
+                  onDragOver={handleDragOver}
+                  onDragEnd={handleDragEnd}
                 />
               ))}
               
